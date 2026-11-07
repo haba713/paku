@@ -1,5 +1,3 @@
-# Builds docs/ with mdBook and deploys it to GitHub Pages.
-# Needs repo Settings > Pages > Source: "GitHub Actions".
 name: deploy-docs
 
 on:
@@ -19,6 +17,9 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+env:
+  SITE_HOST: haba713.github.io/paku
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -27,7 +28,19 @@ jobs:
       - uses: peaceiris/actions-mdbook@v2
         with:
           mdbook-version: latest
+      - run: cargo install mdbook-sitemap-generator
       - run: mdbook build docs
+      - name: Generate sitemap.xml
+        working-directory: docs
+        run: |
+          mdbook-sitemap-generator -d "$SITE_HOST" -o book/sitemap.xml
+          sed -i -e 's|\.md</loc>|.html</loc>|' \
+                -e "s|<loc>https://$SITE_HOST</loc>|<loc>https://$SITE_HOST/</loc>|" book/sitemap.xml
+          if grep -q '\.md</loc>' book/sitemap.xml; then
+            echo "::error::sitemap.xml still has .md URLs"
+            exit 1
+          fi
+          cat book/sitemap.xml
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
