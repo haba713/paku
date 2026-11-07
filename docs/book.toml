@@ -1,0 +1,14 @@
+[book]
+title = "paku Documentation"
+description = "paku is pacman for Git Bash: install MSYS2 packages on Windows x64 and ARM64 per user into ~/.local, no admin rights."
+authors = ["haba713"]
+language = "en"
+src = "src"
+
+[output.html]
+git-repository-url = "https://github.com/haba713/paku"
+edit-url-template = "https://github.com/haba713/paku/edit/master/docs/{path}"
+site-url = "/paku/"
+
+[output.html.search]
+enable = true
