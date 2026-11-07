@@ -15,7 +15,9 @@ use crate::ui::msg;
 
 /// Upgrades for installed packages not already among `targets`, with pacman's warnings.
 pub fn collect<'a>(s: &'a Session, targets: &[Candidate<'a>]) -> Vec<Candidate<'a>> {
-    msg::colon("Starting full system upgrade...");
+    if !s.args.print {
+        msg::colon("Starting full system upgrade...");
+    }
     let skip: Vec<&str> = targets.iter().map(|c| c.pkg.name.as_str()).collect();
     let downgrade = s.args.sysupgrade > 1;
     let outcomes = sysupgrade(s.local.packages(), &s.sync, &skip, downgrade, &|p| ignored(s, p));

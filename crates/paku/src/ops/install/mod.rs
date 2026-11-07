@@ -41,7 +41,9 @@ pub fn run(s: &Session) -> i32 {
         println!(" there is nothing to do");
         return 0;
     }
-    println!("resolving dependencies...");
+    if !s.args.print {
+        println!("resolving dependencies...");
+    }
     let plan = match resolve(&s.sync, &wanted, &|d| is_installed(s, d)) {
         Ok(plan) => plan,
         Err(e) => {
@@ -134,7 +136,9 @@ fn valid_arch(s: &Session, plan: &[Candidate]) -> bool {
 
 /// Declared `CONFLICTS` against installed packages (pacman would offer removal).
 fn no_package_conflicts(s: &Session, plan: &[Candidate]) -> bool {
-    println!("looking for conflicting packages...");
+    if !s.args.print {
+        println!("looking for conflicting packages...");
+    }
     let mut ok = true;
     for c in plan {
         for conflict in c.pkg.conflicts.iter().map(|d| Depend::parse(d)) {
