@@ -28,7 +28,7 @@ jobs:
       - uses: peaceiris/actions-mdbook@v2
         with:
           mdbook-version: latest
-      - run: cargo install mdbook-sitemap-generator
+      - run: cargo install mdbook-sitemap-generator --locked
       - run: mdbook build docs
       - name: Generate sitemap.xml
         working-directory: docs
