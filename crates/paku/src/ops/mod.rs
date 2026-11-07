@@ -5,6 +5,7 @@
 mod deptest;
 mod install;
 mod query;
+mod remove;
 mod sync;
 
 use crate::args::Op;
@@ -17,7 +18,8 @@ pub fn run(op: Op, s: &mut Session) -> i32 {
         Op::Sync => sync::run(s),
         Op::Query => query::run(s),
         Op::DepTest => deptest::run(s),
-        Op::Remove | Op::Upgrade | Op::Database | Op::Files => not_implemented(op),
+        Op::Remove => remove::run(s),
+        Op::Upgrade | Op::Database | Op::Files => not_implemented(op),
     }
 }
 

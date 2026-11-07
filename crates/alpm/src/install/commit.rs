@@ -82,7 +82,7 @@ fn rollback(journal: &Journal) {
 }
 
 /// `<file>.paku-old`, or `<file>.paku-old.N` if a leftover blocks it.
-fn backup_path(dest: &Path) -> PathBuf {
+pub(crate) fn backup_path(dest: &Path) -> PathBuf {
     let base = format!("{}{OLD_SUFFIX}", dest.display());
     let first = PathBuf::from(&base);
     if !first.exists() || fs::remove_file(&first).is_ok() {

@@ -76,6 +76,7 @@ fn write_pkg(repo: &Path, p: &Pkg) -> PathBuf {
         info.push_str(&format!("depend = {d}\n"));
     }
     add(&mut b, ".PKGINFO", info.as_bytes());
+    add_dirs(&mut b, p.files);
     for (path, data) in p.files {
         add(&mut b, &format!("ucrt64/{path}"), data);
     }
@@ -96,6 +97,29 @@ fn desc(p: &Pkg, file: &Path) -> String {
         s.push_str(&format!("%DEPENDS%\n{}\n\n", p.depends.join("\n")));
     }
     s
+}
+
+/// Directory entries for every parent of `files`, as real packages have.
+fn add_dirs(b: &mut tar::Builder<Vec<u8>>, files: &[(&str, &[u8])]) {
+    let mut dirs: Vec<String> = Vec::new();
+    for (path, _) in files {
+        let mut acc = String::from("ucrt64/");
+        for part in path.split('/').rev().skip(1).collect::<Vec<_>>().into_iter().rev() {
+            acc.push_str(part);
+            acc.push('/');
+            if !dirs.contains(&acc) {
+                dirs.push(acc.clone());
+            }
+        }
+    }
+    for d in dirs {
+        let mut h = tar::Header::new_gnu();
+        h.set_entry_type(tar::EntryType::Directory);
+        h.set_size(0);
+        h.set_mode(0o755);
+        h.set_cksum();
+        b.append_data(&mut h, &d, &[][..]).unwrap();
+    }
 }
 
 fn add(b: &mut tar::Builder<Vec<u8>>, path: &str, data: &[u8]) {
@@ -220,4 +244,45 @@ fn sysupgrade_upgrades_installed_packages() {
     assert!(out.status.success(), "{}", text(&out));
     assert!(text(&out).contains("downgrading lib"), "{}", text(&out));
     assert!(!f.root().join("bin/lib-extra.dll").exists());
+}
+
+#[test]
+fn remove_checks_dependencies_and_deletes_files() {
+    let f = Fixture::new(&[APP, LIB]);
+    f.paku(&["-Sy"]);
+    assert!(f.paku(&["-S", "app"]).status.success());
+
+    let out = f.paku(&["-R", "lib"]);
+    assert!(!out.status.success());
+    assert!(
+        text(&out).contains(":: removing lib breaks dependency 'lib' required by app"),
+        "{}",
+        text(&out)
+    );
+    assert!(f.root().join("bin/lib.dll").is_file());
+
+    let out = f.paku(&["-R", "nope"]);
+    assert!(text(&out).contains("error: target not found: nope"), "{}", text(&out));
+
+    let out = f.paku(&["-Rsp", "app"]);
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "app-1.0-1\nlib-2.0-1\n");
+
+    let out = f.paku(&["-Rs", "app"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(text(&out).contains("(2/2) removing lib"), "{}", text(&out));
+    assert!(!f.root().join("bin").exists());
+    assert!(f.paku(&["-Q"]).stdout.is_empty());
+    let log = fs::read_to_string(f.root().join("share/paku/paku.log")).unwrap();
+    assert!(log.contains("[ALPM] removed app (1.0-1)"), "{log}");
+}
+
+#[test]
+fn remove_cascade_takes_dependents() {
+    let f = Fixture::new(&[APP, LIB]);
+    f.paku(&["-Sy"]);
+    assert!(f.paku(&["-S", "app"]).status.success());
+    let out = f.paku(&["-Rc", "lib"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(f.paku(&["-Q"]).stdout.is_empty());
+    assert!(!f.root().join("bin/app.exe").exists());
 }

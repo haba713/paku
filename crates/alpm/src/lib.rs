@@ -13,6 +13,7 @@ mod error;
 pub mod install;
 pub mod lock;
 pub mod log;
+pub mod remove;
 pub mod resolve;
 pub mod search;
 pub mod sysupgrade;

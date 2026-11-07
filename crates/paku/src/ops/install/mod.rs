@@ -157,7 +157,7 @@ fn no_package_conflicts(s: &Session, plan: &[Candidate]) -> bool {
     ok
 }
 
-fn lock_error(e: &alpm::Error) -> i32 {
+pub(super) fn lock_error(e: &alpm::Error) -> i32 {
     msg::error("failed to init transaction (unable to lock database)");
     msg::error(&e.to_string());
     if let alpm::Error::Locked(path) = e {

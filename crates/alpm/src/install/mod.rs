@@ -9,4 +9,4 @@ pub mod conflict;
 pub mod extract;
 
 #[cfg(test)]
-mod testutil;
+pub(crate) mod testutil;

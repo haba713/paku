@@ -97,7 +97,7 @@ fn overwrite_allows(globs: &[String], path: &str) -> bool {
 }
 
 /// Minimal fnmatch: `*` matches any run (including `/`), `?` one character.
-fn glob_match(pattern: &str, text: &str) -> bool {
+pub fn glob_match(pattern: &str, text: &str) -> bool {
     let (p, t): (Vec<char>, Vec<char>) = (pattern.chars().collect(), text.chars().collect());
     let (mut pi, mut ti, mut star, mut mark) = (0, 0, None, 0);
     while ti < t.len() {

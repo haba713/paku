@@ -9,10 +9,10 @@ never need an elevated shell. Commands and options are the same as pacman's.
 
 paku is not affiliated with MSYS2, Arch Linux's pacman or Git for Windows.
 
-> **Status: early development.** Refreshing, searching, installing and upgrading packages work
-> (`-Sy`, `-Ss`, `-Si`, `-Sl`, `-Sg`, `-S <package>`, `-Syu`, `-Q`, `-T`). Package signatures are
-> not verified yet (only SHA-256 checksums). Removing packages (`-R`) and replacing packages
-> (`Replaces`) are not implemented yet.
+> **Status: early development.** Refreshing, searching, installing, upgrading and removing packages
+> work (`-Sy`, `-Ss`, `-Si`, `-Sl`, `-Sg`, `-S <package>`, `-Syu`, `-R`, `-Q`, `-T`). Package
+> signatures are not verified yet (only SHA-256 checksums). Replacing packages (`Replaces`) and
+> saving modified config files as `.pacsave` are not implemented yet.
 
 ## Install
 
@@ -77,6 +77,7 @@ paku -Si rsync          # package details
 paku -S rsync           # install it and its missing dependencies
 paku -Q                 # list packages installed with paku
 paku -Syu               # upgrade all packages installed with paku
+paku -Rs rsync          # remove it and the dependencies nothing else needs
 paku -h                 # help; paku -S -h for -S options
 ```
 
