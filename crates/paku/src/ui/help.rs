@@ -39,7 +39,7 @@ fn overview() -> String {
 pub fn version() -> String {
     let v = env!("CARGO_PKG_VERSION");
     format!(
-        "Paku v{v} - pacman-compatible package manager\n\
+        "paku v{v} - pacman-compatible package manager\n\
          Copyright (C) 2026 paku contributors\n\
          \n\
          Based on pacman\n\
@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn version_is_plain_text() {
         let v = version();
-        assert!(v.starts_with(&format!("Paku v{} - ", env!("CARGO_PKG_VERSION"))));
+        assert!(v.starts_with(&format!("paku v{} - ", env!("CARGO_PKG_VERSION"))));
         assert!(v.contains("Copyright (C) 2006-2024 Pacman Development Team"));
         assert!(v.lines().all(|l| !l.starts_with(' ') && l.len() <= 80));
     }
