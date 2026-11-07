@@ -25,6 +25,20 @@ impl Fixture {
     fn new(pkgs: &[Pkg]) -> Self {
         let dir = TempDir::new("paku-e2e-").unwrap();
         let repo = dir.path().join("repo");
+        let conf = format!(
+            "[options]\nEnvironment = ucrt64\nGitRoot = {}\n\n[test]\nServer = file:///{}\n",
+            dir.path().join("no-git").display(),
+            repo.display().to_string().replace('\\', "/")
+        );
+        fs::write(dir.path().join("paku.conf"), conf).unwrap();
+        let f = Fixture { dir };
+        f.publish(pkgs);
+        f
+    }
+
+    /// Replaces the repository contents with `pkgs`.
+    fn publish(&self, pkgs: &[Pkg]) {
+        let repo = self.dir.path().join("repo");
         fs::create_dir_all(&repo).unwrap();
         let mut db = tar::Builder::new(Vec::new());
         for p in pkgs {
@@ -36,13 +50,6 @@ impl Fixture {
             );
         }
         fs::write(repo.join("test.db"), db.into_inner().unwrap()).unwrap();
-        let conf = format!(
-            "[options]\nEnvironment = ucrt64\nGitRoot = {}\n\n[test]\nServer = file:///{}\n",
-            dir.path().join("no-git").display(),
-            repo.display().to_string().replace('\\', "/")
-        );
-        fs::write(dir.path().join("paku.conf"), conf).unwrap();
-        Fixture { dir }
     }
 
     fn root(&self) -> PathBuf {
@@ -174,4 +181,43 @@ fn needed_skips_installed_package() {
     let out = f.paku(&["-S", "--needed", "lib"]);
     assert!(out.status.success());
     assert!(text(&out).contains("is up to date -- skipping"), "{}", text(&out));
+}
+
+#[test]
+fn sysupgrade_upgrades_installed_packages() {
+    let f = Fixture::new(&[APP, LIB]);
+    f.paku(&["-Sy"]);
+    assert!(f.paku(&["-S", "app"]).status.success());
+    let out = f.paku(&["-Su"]);
+    assert!(out.status.success());
+    assert!(text(&out).contains(" there is nothing to do"), "{}", text(&out));
+
+    const LIB2: Pkg = Pkg {
+        version: "3.0-1",
+        files: &[("bin/lib.dll", b"lib3"), ("bin/lib-extra.dll", b"x")],
+        ..LIB
+    };
+    f.publish(&[APP, LIB2]);
+    let out = f.paku(&["-Syu", "--ignore", "app"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(text(&out).contains("upgrading lib"), "{}", text(&out));
+    assert_eq!(fs::read(f.root().join("bin/lib.dll")).unwrap(), b"lib3");
+    assert!(f.root().join("bin/lib-extra.dll").is_file());
+    let q = f.paku(&["-Q"]);
+    assert_eq!(String::from_utf8_lossy(&q.stdout), "app 1.0-1\nlib 3.0-1\n");
+    let deps = f.paku(&["-Qqd"]);
+    assert_eq!(String::from_utf8_lossy(&deps.stdout), "lib\n");
+
+    f.publish(&[APP, LIB]);
+    f.paku(&["-Sy"]);
+    let out = f.paku(&["-Su"]);
+    assert!(
+        text(&out).contains("lib: local (3.0-1) is newer than test (2.0-1)"),
+        "{}",
+        text(&out)
+    );
+    let out = f.paku(&["-Suu"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(text(&out).contains("downgrading lib"), "{}", text(&out));
+    assert!(!f.root().join("bin/lib-extra.dll").exists());
 }

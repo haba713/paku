@@ -15,6 +15,7 @@ pub mod lock;
 pub mod log;
 pub mod resolve;
 pub mod search;
+pub mod sysupgrade;
 pub mod version;
 
 pub use error::{Error, Result};

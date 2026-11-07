@@ -3,12 +3,13 @@
 // Port of sync_trans in src/pacman/sync.c and _alpm_sync_prepare / _alpm_sync_commit
 // in lib/libalpm/sync.c.
 
-//! `-S <targets>`: resolve, confirm, download, verify, extract, check conflicts, install.
+//! `-S <targets>` and `-Su`: resolve, confirm, download, verify, extract, check conflicts, install.
 
 mod commit;
 mod confirm;
 mod notes;
 mod targets;
+mod upgrades;
 
 use std::path::PathBuf;
 
@@ -32,12 +33,16 @@ pub fn run(s: &Session) -> i32 {
     if !targets.ok {
         return 1;
     }
-    if targets.packages.is_empty() {
+    let mut wanted = targets.packages.clone();
+    if s.args.sysupgrade > 0 {
+        wanted.extend(upgrades::collect(s, &targets.packages));
+    }
+    if wanted.is_empty() {
         println!(" there is nothing to do");
         return 0;
     }
     println!("resolving dependencies...");
-    let plan = match resolve(&s.sync, &targets.packages, &|d| is_installed(s, d)) {
+    let plan = match resolve(&s.sync, &wanted, &|d| is_installed(s, d)) {
         Ok(plan) => plan,
         Err(e) => {
             msg::error("failed to prepare transaction (could not satisfy dependencies)");

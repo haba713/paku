@@ -52,10 +52,6 @@ pub fn run(s: &mut Session) -> i32 {
     if a.list {
         return list(s);
     }
-    if a.sysupgrade > 0 {
-        msg::error("--sysupgrade is not implemented yet");
-        return 1;
-    }
     super::install::run(s)
 }
 
