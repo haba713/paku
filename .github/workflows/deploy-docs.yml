@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  SITE_HOST: haba713.github.io/paku
+  SITE_URL: https://haba713.github.io/paku/
 
 jobs:
   build:
@@ -28,18 +28,24 @@ jobs:
       - uses: peaceiris/actions-mdbook@v2
         with:
           mdbook-version: latest
-      - run: cargo install mdbook-sitemap-generator --locked
       - run: mdbook build docs
       - name: Generate sitemap.xml
         working-directory: docs
+        # One <url> per chapter in src/; root 1.0, chapters 0.8, index.html (duplicate of root) 0.5.
         run: |
-          mdbook-sitemap-generator -d "$SITE_HOST" -o book/sitemap.xml
-          sed -i -e 's|\.md</loc>|.html</loc>|' \
-                -e "s|<loc>https://$SITE_HOST</loc>|<loc>https://$SITE_HOST/</loc>|" book/sitemap.xml
-          if grep -q '\.md</loc>' book/sitemap.xml; then
-            echo "::error::sitemap.xml still has .md URLs"
-            exit 1
-          fi
+          url() { printf '  <url>\n    <loc>%s</loc>\n    <priority>%s</priority>\n  </url>\n' "$1" "$2"; }
+          {
+            echo '<?xml version="1.0" encoding="UTF-8"?>'
+            echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+            url "$SITE_URL" 1.0
+            for md in $(cd src && find . -name '*.md' ! -name SUMMARY.md | sed 's|^\./||' | sort); do
+              page="${md%.md}.html"
+              priority=0.8
+              [ "$page" = index.html ] && priority=0.5
+              url "$SITE_URL$page" "$priority"
+            done
+            echo '</urlset>'
+          } > book/sitemap.xml
           cat book/sitemap.xml
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
