@@ -180,7 +180,7 @@ fn after_install(s: &Session, plan: &[Candidate], extracted: &[Extracted]) {
         }
         notes::msys_caveat(c.repo, &c.pkg.name, &x.files);
     }
-    notes::path_hint(&s.layout().install_path("bin"));
+    notes::path_hint(&s.layout().install_path("bin"), &s.conf.home);
 }
 
 fn now() -> i64 {

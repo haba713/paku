@@ -33,12 +33,18 @@ curl -fsSL https://raw.githubusercontent.com/haba713/paku/master/install.sh | PA
 
 ## Add paku to PATH
 
-If `~/.local/bin` is not on your `PATH` yet, the script prints how to add it. Add it once to your
-Windows user `PATH`, so Git Bash, cmd and PowerShell all find it:
+If `~/.local/bin` is not on your `PATH` yet, the script prints how to add it. Add it to Git Bash's
+`PATH` in `~/.bashrc`, then open a new Git Bash window:
 
-1. Start menu: open "Edit environment variables for your account".
-2. Select `Path`, click Edit, then New, and enter `%USERPROFILE%\.local\bin`.
-3. Click OK twice and open a new Git Bash window.
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+```
+
+Avoid adding `~/.local/bin` to the Windows user `PATH` for cmd and PowerShell: `msys` programs such
+as `rsync` need DLLs from Git's `usr\bin` (`msys-2.0.dll`, `msys-iconv-2.dll`, ...), which only Git
+Bash has on its `PATH`, so they fail to start there. Native Windows packages (`mingw-w64-ucrt-x86_64-*`,
+`mingw-w64-clang-aarch64-*`) keep their DLLs next to the program and would work, but the same
+directory holds both kinds.
 
 ## Manual installation
 

@@ -46,17 +46,35 @@ pub fn msys_caveat(repo: &str, name: &str, files: &[String]) {
     }
 }
 
-/// Tells the user how to put the prefix's `bin` on the Windows user `PATH`.
-pub fn path_hint(bin: &Path) {
+/// Tells the user how to put the prefix's `bin` on Git Bash's `PATH` via `~/.bashrc`.
+/// Not the Windows user `PATH`: msys programs need Git's `usr/bin` DLLs, which only
+/// Git Bash has on its `PATH`.
+pub fn path_hint(bin: &Path, home: &Path) {
     if on_path(bin) {
         return;
     }
-    let win = bin.display().to_string().replace('/', "\\");
+    let line = format!("export PATH=\"{}:$PATH\"", bash_path(bin, home));
     println!();
-    println!("To use installed programs, add {win} to your Windows user PATH:");
-    println!("  1. Start menu: open \"Edit environment variables for your account\".");
-    println!("  2. Select \"Path\", click Edit, then New, and enter the directory above.");
-    println!("  3. Click OK twice and open a new Git Bash window.");
+    println!("To use installed programs, add this line to ~/.bashrc and open a new Git Bash window:");
+    println!("  {line}");
+    println!("or run:");
+    println!("  echo '{line}' >> ~/.bashrc");
+}
+
+/// `bin` as Git Bash writes it: `$HOME/...` under `home`, else `/c/...`.
+fn bash_path(bin: &Path, home: &Path) -> String {
+    if let Ok(rest) = bin.strip_prefix(home) {
+        let rest = rest.display().to_string().replace('\\', "/");
+        return format!("$HOME/{rest}");
+    }
+    let s = bin.display().to_string().replace('\\', "/");
+    let mut chars = s.chars();
+    match (chars.next(), chars.next()) {
+        (Some(drive), Some(':')) if drive.is_ascii_alphabetic() => {
+            format!("/{}{}", drive.to_ascii_lowercase(), chars.as_str())
+        }
+        _ => s,
+    }
 }
 
 fn on_path(bin: &Path) -> bool {
@@ -80,5 +98,15 @@ mod tests {
             normalize("C:/Users/Me/.local/bin/"),
             normalize("c:\\users\\me\\.local\\bin")
         );
+    }
+
+    #[test]
+    fn bash_paths() {
+        let home = Path::new("C:\\Users\\me");
+        assert_eq!(
+            bash_path(Path::new("C:\\Users\\me\\.local\\bin"), home),
+            "$HOME/.local/bin"
+        );
+        assert_eq!(bash_path(Path::new("D:\\tools\\bin"), home), "/d/tools/bin");
     }
 }

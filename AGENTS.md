@@ -113,10 +113,10 @@ MSYS2-specific patches are under `#ifdef __MSYS__` — grep for them; most matte
 
 - Git for Windows puts `~/bin` on `PATH`, but not `~/.local/bin`. Like Claude Code's installer,
   paku never edits shell profiles or environment variables; it tells the user what to add. When
-  `<prefix>/bin` is not on `PATH`, `install.sh` and paku (after installing) print how to add its
-  Windows form (e.g. `C:\Users\me\.local\bin`) to the Windows **user** `PATH` environment variable,
-  as steps in the "Edit environment variables for your account" dialog. Git Bash, cmd and PowerShell
-  all build their `PATH` from it, so one setting covers every shell.
+  `<prefix>/bin` is not on `PATH`, `install.sh` and paku (after installing) print the
+  `export PATH="$HOME/.local/bin:$PATH"` line to add to `~/.bashrc`. Not the Windows user `PATH`:
+  msys programs need DLLs from Git's `usr/bin` (`msys-2.0.dll`, `msys-iconv-2.dll`, ...), which
+  only Git Bash has on its `PATH`, so from cmd or PowerShell they fail to start.
 - `/etc/package-versions.txt` lists the MSYS2 packages bundled with Git (`name version` per line).
   Load it as a read-only **virtual local DB** ("provided by Git"): satisfies dependencies, never
   upgraded or removed, not listed by `-Q` (so `-Qq` output only covers paku's own packages),

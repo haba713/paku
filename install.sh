@@ -40,10 +40,10 @@ main() {
         *":$dir:"*) ;;
         *)
             echo
-            echo "Add $(cygpath -w "$dir") to your Windows user PATH:"
-            echo "  1. Start menu: open \"Edit environment variables for your account\"."
-            echo "  2. Select \"Path\", click Edit, then New, and enter the directory above."
-            echo "  3. Click OK twice and open a new Git Bash window."
+            echo "Add this line to ~/.bashrc and open a new Git Bash window:"
+            echo '  export PATH="$HOME/.local/bin:$PATH"'
+            echo "or run:"
+            echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc"
             ;;
     esac
 }
