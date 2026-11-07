@@ -1,0 +1,30 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+repository = "https://github.com/haba713/paku"
+
+[workspace.dependencies]
+paku-formats = { path = "crates/paku-formats" }
+paku-layout = { path = "crates/paku-layout" }
+paku-platform = { path = "crates/paku-platform" }
+alpm = { path = "crates/alpm" }
+
+thiserror = "2"
+anyhow = "1"
+tar = { version = "0.4", default-features = false }
+ruzstd = "0.8"
+flate2 = "1"
+lzma-rs = "0.3"
+sha2 = "0.11"
+regex = "1"
+httpdate = "1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

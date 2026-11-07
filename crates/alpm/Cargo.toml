@@ -1,0 +1,22 @@
+[package]
+name = "alpm"
+description = "Package management library for paku (Rust port of libalpm)"
+license = "GPL-2.0-or-later"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+paku-formats.workspace = true
+paku-layout.workspace = true
+thiserror.workspace = true
+paku-platform.workspace = true
+sha2.workspace = true
+httpdate.workspace = true
+regex.workspace = true
+
+[dev-dependencies]
+flate2.workspace = true
+tar.workspace = true

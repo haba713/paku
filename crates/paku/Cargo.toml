@@ -1,0 +1,18 @@
+[package]
+name = "paku"
+description = "pacman-compatible per-user package manager for Git for Windows"
+license = "GPL-2.0-or-later"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+alpm.workspace = true
+paku-formats.workspace = true
+paku-layout.workspace = true
+paku-platform.workspace = true
+
+[dev-dependencies]
+tar.workspace = true

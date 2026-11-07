@@ -1,0 +1,15 @@
+[package]
+name = "paku-formats"
+description = "Readers and writers for MSYS2/pacman package and database file formats"
+license = "MIT"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+tar.workspace = true
+ruzstd.workspace = true
+flate2.workspace = true
+lzma-rs.workspace = true

@@ -1,0 +1,4 @@
+# Link the C runtime statically in MSVC builds, so paku.exe needs no Visual C++
+# Redistributable (vcruntime140.dll). GNU builds only use DLLs that ship with Windows.
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]

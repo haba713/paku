@@ -1,0 +1,11 @@
+[package]
+name = "paku-layout"
+description = "Maps MSYS2 package archive paths to a per-user install prefix"
+license = "MIT"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+thiserror.workspace = true
