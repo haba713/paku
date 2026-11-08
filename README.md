@@ -198,20 +198,20 @@ Downloads use Windows' built-in WinHTTP, so the system's certificates and proxy 
 
 A Cargo workspace mirroring pacman's library / front-end split:
 
-| Crate           | License          | Purpose                                                       |
-|-----------------|------------------|---------------------------------------------------------------|
-| `paku`          | GPL-2.0-or-later | the binary: argument parsing, config, operations, output      |
-| `alpm`          | GPL-2.0-or-later | libalpm equivalent: databases, dependencies, transactions     |
-| `paku-formats`  | MIT              | `desc`, `.PKGINFO`, mtree parsers, archive decompression      |
-| `paku-layout`   | MIT              | archive path to install path relocation                       |
-| `paku-platform` | MIT              | native CPU detection, WinHTTP, file-in-use handling, symlinks |
+| Crate           | Purpose                                                       |
+|-----------------|---------------------------------------------------------------|
+| `paku`          | the binary: argument parsing, config, operations, output      |
+| `alpm`          | libalpm equivalent: databases, dependencies, transactions     |
+| `paku-formats`  | `desc`, `.PKGINFO`, mtree parsers, archive decompression      |
+| `paku-layout`   | archive path to install path relocation                       |
+| `paku-platform` | native CPU detection, WinHTTP, file-in-use handling, symlinks |
 
 See [AGENTS.md](AGENTS.md) for the full architecture and conventions.
 
 ## Contributing
 
 Bug reports and pull requests are welcome. Before you start, read [AGENTS.md](AGENTS.md): it covers
-the architecture, coding conventions, licensing per crate and commit message style.
+the architecture, coding conventions, licensing and commit message style.
 
 ### Building from source
 
@@ -228,6 +228,4 @@ mkdir -p ~/.local/bin && cp target/release/paku.exe ~/.local/bin/
 ## License
 
 paku is a port of pacman and is licensed under the
-[GNU General Public License v2.0 or later](LICENSE.md). The crates `paku-formats`, `paku-layout`
-and `paku-platform` contain no code derived from pacman and are MIT-licensed; see the `LICENSE.md`
-file in each crate's directory.
+[GNU General Public License v2.0 or later](LICENSE.md), all crates included.

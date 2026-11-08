@@ -1,7 +1,7 @@
 [package]
 name = "paku-formats"
 description = "Readers and writers for MSYS2/pacman package and database file formats"
-license = "MIT"
+license = "GPL-2.0-or-later"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

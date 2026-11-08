@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 //! Minimal kernel32 bindings (avoids a `windows-sys` dependency).
 

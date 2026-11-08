@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 //! Relocation of MSYS2 package archive paths into a per-user install prefix.
 //!

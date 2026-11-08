@@ -45,5 +45,4 @@ Next steps:
 - [README](https://github.com/haba713/paku#readme): project overview and build steps
 - [AGENTS.md](https://github.com/haba713/paku/blob/master/AGENTS.md): architecture and conventions
 - [Issues](https://github.com/haba713/paku/issues): bug reports and feature requests
-- [License](https://github.com/haba713/paku/blob/master/LICENSE.md): GPL-2.0-or-later; the crates
-  `paku-formats`, `paku-layout` and `paku-platform` are MIT
+- [License](https://github.com/haba713/paku/blob/master/LICENSE.md): GPL-2.0-or-later

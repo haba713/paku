@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 //! Package metadata as stored in sync database `desc` records and `.PKGINFO`.
 

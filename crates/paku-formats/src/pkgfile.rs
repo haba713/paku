@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 //! Package archives (`*.pkg.tar.zst`, `*.pkg.tar.xz`, ...): a compressed tarball whose
 //! root holds metadata files (`.PKGINFO`, `.MTREE`, `.BUILDINFO`, optional `.INSTALL`)

@@ -31,23 +31,14 @@ pacman is GPL-2.0-or-later, and paku ports its code, so paku as a whole is
 pick GPLv3 (which also makes Apache-2.0 dependencies compatible). Keep it; never narrow it to
 GPL-2.0-only or GPL-3.0-only.
 
-To keep as much as possible MIT-like, license per crate by origin:
+All crates, including original code with no pacman-derived logic, and `install.sh` use the same
+license; there are no MIT parts.
 
-| Crate content                                             | License            |
-|-----------------------------------------------------------|--------------------|
-| ported from pacman/libalpm (resolver, vercmp, trans, CLI) | `GPL-2.0-or-later` |
-| original code with no pacman-derived logic                | `MIT`              |
-
-- Put original, reusable code in separate MIT crates, e.g. `paku-layout`, `paku-platform`,
-  `paku-formats` (parsers written from the formats, not from `be_*.c`); see
-  [Architecture](#architecture). MIT code can be used by the GPL crates; never the other way round.
-- Every source file starts with an SPDX header: `// SPDX-License-Identifier: GPL-2.0-or-later` or
-  `// SPDX-License-Identifier: MIT`. Ported files also keep the upstream copyright lines, e.g.
+- Every source file starts with `// SPDX-License-Identifier: GPL-2.0-or-later` (`#` in shell
+  scripts). Files ported from pacman also keep the upstream copyright lines, e.g.
   `// Copyright (c) 2006-2024 Pacman Development Team <pacman-dev@lists.archlinux.org>`.
-- Once an MIT file takes logic from pacman source, it becomes GPL: move it to a GPL crate and change
-  its header. When unsure, GPL.
-- Repo root: `LICENSE.md` (GPL-2.0 text) for the workspace, `LICENSE.md` (MIT text) in each MIT crate;
-  `Cargo.toml` `license` field per crate matches.
+- One `LICENSE.md` (GPL-2.0 text) at the repo root; every crate's `Cargo.toml` has
+  `license = "GPL-2.0-or-later"`.
 - Dependencies must be GPL-2.0-or-later compatible: MIT, BSD, ISC, Zlib, Apache-2.0 (via GPLv3),
   MPL-2.0. Check with `cargo deny check licenses`.
 
@@ -244,15 +235,15 @@ Keep these pacman-compatible.
 
 ## Architecture
 
-Cargo workspace mirroring pacman's lib/front-end split, plus MIT crates for original code
-(see [License](#license)):
+Cargo workspace mirroring pacman's lib/front-end split, plus small crates for code with no pacman
+counterpart:
 
 ```
 crates/
-  paku-layout/    MIT  archive path -> install path relocation (the only place building install paths)
-  paku-platform/  MIT  native arch detection, file-in-use handling, symlink fallback, long paths
-  paku-formats/   MIT  desc / .PKGINFO / mtree / package-versions.txt parsers, archive decompression
-  alpm/             GPL  libalpm equivalent: no printing, no prompts; returns events via callbacks
+  paku-layout/     archive path -> install path relocation (the only place building install paths)
+  paku-platform/   native arch detection, file-in-use handling, symlink fallback, long paths
+  paku-formats/    desc / .PKGINFO / mtree / package-versions.txt parsers, archive decompression
+  alpm/            libalpm equivalent: no printing, no prompts; returns events via callbacks
     src/version.rs   vercmp
     src/db/          sync.rs, local.rs, git_provided.rs
     src/pkg.rs       package archive reading + extraction
@@ -260,7 +251,7 @@ crates/
     src/trans/       prepare.rs, commit.rs, add.rs, remove.rs, conflict.rs
     src/download.rs  parallel downloads, mirrors, resume, timeouts
     src/signing.rs   PGP verification, SigLevel
-  paku/           GPL  binary, pacman front-end equivalent
+  paku/            binary, pacman front-end equivalent
     src/args/        getopt-style parser + per-op option structs
     src/conf/       paku.conf / Include parsing, defaults, home and Git root lookup
     src/session.rs   arguments + config + loaded databases shared by operations

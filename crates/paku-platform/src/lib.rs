@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 //! Host platform helpers for paku: native architecture, HTTP over WinHTTP,
 //! temporary directories, terminal detection (including Git Bash's mintty)

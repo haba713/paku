@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 //! Git for Windows' `/etc/package-versions.txt`: one `name version` pair per line,
 //! listing the MSYS2 packages bundled with Git.

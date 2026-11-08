@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 //! Dependency strings such as `foo`, `foo>=1.2-1` or `foo: optional feature`.
 
