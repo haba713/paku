@@ -147,7 +147,12 @@ paku's own state. With the default prefix, the database and log sit in `<prefix>
 | keyring         | `~/.local/share/paku/keyring`         | `/etc/pacman.d/gnupg`        |
 | log             | `~/.local/share/paku/paku.log`        | `/var/log/pacman.log`        |
 
-The keyring is seeded from an embedded copy of the `msys2-keyring` package.
+The keyring is an embedded copy of the `msys2-keyring` package (`crates/alpm/keyring/`, see its
+`README.md` for updating); `msys2.gpg` and `msys2-revoked` in `GPGDir` override it. Trust model:
+every key in the keyring that is not revoked is trusted (the keyring is the trust anchor, as after
+`pacman-key --populate`); certifications by the master keys are not checked. Supported: v4 RSA keys,
+v4 binary-document signatures over SHA-256/384/512 — what MSYS2 uses. `SigLevel` defaults to
+`Required` for databases and packages, like MSYS2's `pacman.conf`.
 
 `--root`, `--dbpath`, `--cachedir`, `--config`, `--gpgdir`, `--logfile` override these exactly as
 in pacman. `--sysroot` is accepted but only remaps paku's paths (no chroot on Windows).
@@ -250,7 +255,7 @@ crates/
     src/deps.rs      resolver, provides/conflicts/replaces, topo sort
     src/trans/       prepare.rs, commit.rs, add.rs, remove.rs, conflict.rs
     src/download.rs  parallel downloads, mirrors, resume, timeouts
-    src/signing.rs   PGP verification, SigLevel
+    src/signing/     OpenPGP packets, keyring, verification, SigLevel
   paku/            binary, pacman front-end equivalent
     src/args/        getopt-style parser + per-op option structs
     src/conf/       paku.conf / Include parsing, defaults, home and Git root lookup
@@ -267,8 +272,10 @@ Crates in use:
 - `thiserror` in libraries; no `windows-sys`: kernel32 and winhttp calls are declared in
   `paku-platform` (`ffi.rs`, `http/ffi.rs`); temp dirs come from `paku_platform::TempDir`
   (no `tempfile`)
-- planned: signature checks via Windows CNG (`bcrypt`) plus a minimal OpenPGP parser (rPGP pulls in
-  `getrandom`), `sha2` for checksums, `cargo-deny` as a dev tool
+- `sha2` for checksums and signature digests, `sha1` for OpenPGP key fingerprints; RSA signature
+  checks via Windows CNG (`bcrypt`, `paku-platform::rsa`) behind a minimal OpenPGP parser in
+  `alpm::signing` (no rPGP: it pulls in `getrandom`)
+- planned: `cargo-deny` as a dev tool
 
 Rule: no dependency may need a C compiler, `dlltool` or the Windows SDK (no `ring`, `windows-sys`
 0.61+, `getrandom` 0.3+), so the project builds with the `x86_64-pc-windows-gnu` toolchain alone.

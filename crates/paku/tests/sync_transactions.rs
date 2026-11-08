@@ -22,12 +22,20 @@ struct Fixture {
 }
 
 impl Fixture {
+    /// Unsigned test repository with signature checks off (`SigLevel = Never`).
     fn new(pkgs: &[Pkg]) -> Self {
+        Self::with_siglevel(pkgs, "Never")
+    }
+
+    /// Unsigned test repository with the given `SigLevel` for `[test]`.
+    fn with_siglevel(pkgs: &[Pkg], siglevel: &str) -> Self {
         let dir = TempDir::new("paku-e2e-").unwrap();
         let repo = dir.path().join("repo");
         let conf = format!(
-            "[options]\nEnvironment = ucrt64\nGitRoot = {}\n\n[test]\nServer = file:///{}\n",
+            "[options]\nEnvironment = ucrt64\nGitRoot = {}\nGPGDir = {}\n\n\
+             [test]\nServer = file:///{}\nSigLevel = {siglevel}\n",
             dir.path().join("no-git").display(),
+            dir.path().join("keyring").display(),
             repo.display().to_string().replace('\\', "/")
         );
         fs::write(dir.path().join("paku.conf"), conf).unwrap();
@@ -163,6 +171,40 @@ fn installs_package_with_dependency() {
     assert_eq!(String::from_utf8_lossy(&q.stdout), "app 1.0-1\nlib 2.0-1\n");
     let deps = f.paku(&["-Qqd"]);
     assert_eq!(String::from_utf8_lossy(&deps.stdout), "lib\n");
+}
+
+#[test]
+fn unsigned_database_is_rejected_by_default() {
+    let f = Fixture::with_siglevel(&[APP, LIB], "Required");
+    let out = f.paku(&["-Sy"]);
+    assert!(!out.status.success());
+    let t = text(&out);
+    assert!(t.contains("error: test: missing required signature"), "{t}");
+    assert!(
+        t.contains("failed to update test (invalid or corrupted database (PGP signature))"),
+        "{t}"
+    );
+    assert!(!f.root().join("share/paku/db/sync/test.db").exists());
+}
+
+#[test]
+fn unsigned_package_is_rejected_before_install() {
+    let f = Fixture::with_siglevel(&[APP, LIB], "DatabaseNever PackageRequired");
+    assert!(f.paku(&["-Sy"]).status.success());
+    let out = f.paku(&["-S", "lib"]);
+    assert!(!out.status.success());
+    let t = text(&out);
+    assert!(t.contains("error: lib: missing required signature"), "{t}");
+    assert!(t.contains("invalid or corrupted package (PGP signature)"), "{t}");
+    assert!(!f.root().join("bin/lib.dll").exists());
+}
+
+#[test]
+fn optional_siglevel_accepts_unsigned_repo() {
+    let f = Fixture::with_siglevel(&[LIB], "Optional");
+    assert!(f.paku(&["-Sy"]).status.success());
+    let out = f.paku(&["-S", "lib"]);
+    assert!(out.status.success(), "{}", text(&out));
 }
 
 #[test]

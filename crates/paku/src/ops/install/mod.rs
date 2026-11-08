@@ -8,6 +8,7 @@
 mod commit;
 mod confirm;
 mod notes;
+mod signatures;
 mod targets;
 mod upgrades;
 
@@ -71,7 +72,9 @@ fn proceed(s: &Session, plan: &[Candidate], explicit: &[Candidate]) -> i32 {
         return 1;
     };
     println!("checking package integrity...");
-    msg::warning("package signatures are not verified yet; only SHA-256 checksums are checked");
+    if !signatures::verify(s, plan, &files) {
+        return 1;
+    }
     if s.args.downloadonly {
         return 0;
     }

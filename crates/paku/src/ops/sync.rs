@@ -58,15 +58,24 @@ pub fn run(s: &mut Session) -> i32 {
 /// Downloads fresh databases (`-y`, `-yy` forces).
 fn refresh(s: &Session) -> i32 {
     msg::colon("Synchronizing package databases...");
+    let Some(keyring) = s.keyring() else {
+        return 1;
+    };
     let force = s.args.refresh > 1;
     let opts = s.download_options();
     let mut failed = false;
     for db in &s.sync {
-        match db.refresh(&s.conf.dbpath, force, &opts) {
+        match db.refresh(&s.conf.dbpath, force, &opts, &keyring) {
             Ok(Fetched::UpToDate) => println!(" {} is up to date", db.name()),
             Ok(Fetched::Updated) => println!(" {} downloaded", db.name()),
             Err(e) => {
                 msg::error(&e.to_string());
+                if matches!(e, alpm::Error::Signature { .. }) {
+                    msg::error(&format!(
+                        "failed to update {} (invalid or corrupted database (PGP signature))",
+                        db.name()
+                    ));
+                }
                 failed = true;
             }
         }

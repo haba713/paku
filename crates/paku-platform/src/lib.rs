@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 //! Host platform helpers for paku: native architecture, HTTP over WinHTTP,
-//! temporary directories, terminal detection (including Git Bash's mintty)
-//! and local time conversion.
+//! RSA signature verification over CNG, temporary directories, terminal
+//! detection (including Git Bash's mintty) and local time conversion.
 
 mod arch;
 pub mod http;
+pub mod rsa;
 mod tempdir;
 mod term;
 mod time;

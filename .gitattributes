@@ -1,2 +1,5 @@
 * text=auto eol=lf
 *.exe binary
+# Signed fixtures and keyring: byte-exact, no line-ending conversion
+crates/alpm/testdata/** -text
+crates/alpm/keyring/msys2* -text

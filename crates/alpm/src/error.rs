@@ -55,6 +55,14 @@ pub enum Error {
     /// A package archive lacks or has an unusable `.PKGINFO`.
     #[error("{0}: missing or invalid .PKGINFO")]
     BadPackage(String),
+    /// A database or package failed its signature check.
+    #[error("{name}: {source}")]
+    Signature {
+        /// Repository or package name.
+        name: String,
+        /// What was wrong with the signature.
+        source: crate::signing::SigError,
+    },
 }
 
 /// Result alias for this crate.

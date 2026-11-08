@@ -8,6 +8,7 @@ use std::path::PathBuf;
 
 use super::ini::Entry;
 use super::paths::expand_tilde;
+use super::siglevel::SigLevelSetting;
 use super::{Config, Repo, default_repos};
 use crate::args::Args;
 
@@ -19,7 +20,6 @@ const IGNORED_OPTIONS: &[&str] = &[
     "ILoveCandy",
     "XferCommand",
     "CleanMethod",
-    "SigLevel",
     "LocalFileSigLevel",
     "RemoteFileSigLevel",
     "DownloadUser",
@@ -37,7 +37,7 @@ pub fn file(conf: &mut Config, entries: &[Entry]) -> Result<(), String> {
             option(conf, e)?;
             continue;
         }
-        repo_entry(conf, &mut repos, e);
+        repo_entry(conf, &mut repos, e)?;
     }
     if !repos.is_empty() {
         conf.repos = repos;
@@ -75,28 +75,39 @@ fn option(conf: &mut Config, e: &Entry) -> Result<(), String> {
         "VerbosePkgLists" => conf.verbose_pkg_lists = true,
         "DisableDownloadTimeout" => conf.disable_dl_timeout = true,
         "ParallelDownloads" => conf.parallel_downloads = parse_parallel(e)?,
+        "SigLevel" => apply_siglevel(&mut conf.siglevel, e)?,
         key if IGNORED_OPTIONS.contains(&key) => {}
         key => conf.warnings.push(not_recognized(e, key)),
     }
     Ok(())
 }
 
-fn repo_entry(conf: &mut Config, repos: &mut Vec<Repo>, e: &Entry) {
+fn repo_entry(conf: &mut Config, repos: &mut Vec<Repo>, e: &Entry) -> Result<(), String> {
     let idx = match repos.iter().position(|r| r.name == e.section) {
         Some(i) => i,
         None => {
             repos.push(Repo {
                 name: e.section.clone(),
                 servers: Vec::new(),
+                siglevel: SigLevelSetting::default(),
             });
             repos.len() - 1
         }
     };
     match e.key.as_str() {
         "Server" => repos[idx].servers.extend(e.value.clone()),
-        "SigLevel" | "Usage" | "CacheServer" => {}
+        "SigLevel" => apply_siglevel(&mut repos[idx].siglevel, e)?,
+        "Usage" | "CacheServer" => {}
         key => conf.warnings.push(not_recognized(e, key)),
     }
+    Ok(())
+}
+
+fn apply_siglevel(setting: &mut SigLevelSetting, e: &Entry) -> Result<(), String> {
+    let v = e.value.as_deref().unwrap_or_default();
+    setting
+        .apply(v)
+        .map_err(|token| format!("{}: invalid value for 'SigLevel' : '{token}'", e.origin))
 }
 
 /// `Architecture = auto|x86_64|aarch64`; picks the matching environment.
@@ -197,6 +208,22 @@ mod tests {
         assert_eq!(c.repos.len(), 1);
         assert_eq!(c.repos[0].servers, ["file:///C:/repo"]);
         assert_eq!(c.warnings.len(), 1);
+    }
+
+    #[test]
+    fn siglevel_global_and_per_repo() {
+        use alpm::signing::Check;
+        let mut c = conf();
+        let entries = [
+            entry("options", "SigLevel", Some("Optional")),
+            entry("r", "Server", Some("file:///C:/r")),
+            entry("r", "SigLevel", Some("PackageRequired")),
+        ];
+        file(&mut c, &entries).unwrap();
+        let level = c.siglevel_for(&c.repos[0]);
+        assert_eq!((level.package, level.database), (Check::Required, Check::Optional));
+        let err = file(&mut c, &[entry("options", "SigLevel", Some("Bogus"))]).unwrap_err();
+        assert_eq!(err, "test:1: invalid value for 'SigLevel' : 'Bogus'");
     }
 
     #[test]

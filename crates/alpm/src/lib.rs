@@ -16,6 +16,7 @@ pub mod log;
 pub mod remove;
 pub mod resolve;
 pub mod search;
+pub mod signing;
 pub mod sysupgrade;
 pub mod version;
 

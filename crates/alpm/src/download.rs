@@ -173,6 +173,27 @@ pub fn fetch_package(
     })
 }
 
+/// Detached signature of package `filename`: the sync database's base64 `PGPSIG`,
+/// else `<filename>.sig` from the servers (kept in `cache_dir` next to the package).
+/// `Ok(None)` when neither exists.
+pub fn package_signature(
+    servers: &[String],
+    filename: &str,
+    cache_dir: &Path,
+    pgpsig: Option<&str>,
+    opts: &Options,
+) -> std::result::Result<Option<Vec<u8>>, crate::signing::SigError> {
+    if let Some(b64) = pgpsig {
+        return crate::signing::base64_decode(b64).map(Some);
+    }
+    let sig_file = format!("{filename}.sig");
+    let path = cache_dir.join(&sig_file);
+    if fetch(servers, &sig_file, &path, false, opts).is_err() && !path.is_file() {
+        return Ok(None);
+    }
+    Ok(fs::read(&path).ok())
+}
+
 fn checksum_ok(path: &Path, expected: Option<&str>) -> Result<bool> {
     let Some(expected) = expected else {
         return Ok(true);
@@ -235,5 +256,25 @@ mod tests {
         let bad = fetch_package(&servers, "p.pkg.tar", cache.path(), Some("00"), &opts);
         assert!(matches!(bad, Err(Error::ChecksumMismatch(_))));
         assert!(!cache.path().join("p.pkg.tar").exists());
+    }
+
+    #[test]
+    fn package_signature_sources() {
+        let repo = paku_platform::TempDir::new("paku-test-").unwrap();
+        let cache = paku_platform::TempDir::new("paku-test-").unwrap();
+        let servers = vec![file_server(repo.path())];
+        let opts = Options::default();
+
+        let from_db = package_signature(&servers, "p.pkg", cache.path(), Some("Zm9v"), &opts);
+        assert_eq!(from_db.unwrap().as_deref(), Some(&b"foo"[..]));
+        assert_eq!(
+            package_signature(&servers, "p.pkg", cache.path(), None, &opts).unwrap(),
+            None
+        );
+
+        fs::write(repo.path().join("p.pkg.sig"), b"sig").unwrap();
+        let from_file = package_signature(&servers, "p.pkg", cache.path(), None, &opts);
+        assert_eq!(from_file.unwrap().as_deref(), Some(&b"sig"[..]));
+        assert!(package_signature(&servers, "p.pkg", cache.path(), Some("**"), &opts).is_err());
     }
 }

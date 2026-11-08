@@ -7,11 +7,14 @@
 mod apply;
 pub mod ini;
 pub mod paths;
+pub mod siglevel;
 
 use std::path::PathBuf;
 
+use alpm::signing::SigLevel;
 use paku_platform::{HostArch, native_arch};
 
+use self::siglevel::SigLevelSetting;
 use crate::args::{Args, ColorMode};
 
 /// One configured repository.
@@ -21,6 +24,8 @@ pub struct Repo {
     pub name: String,
     /// Server URLs with `$repo`/`$arch` still unexpanded.
     pub servers: Vec<String>,
+    /// The repository's own `SigLevel` lines.
+    pub siglevel: SigLevelSetting,
 }
 
 /// Effective configuration.
@@ -51,6 +56,8 @@ pub struct Config {
     pub verbose_pkg_lists: bool,
     pub parallel_downloads: u32,
     pub disable_dl_timeout: bool,
+    /// `SigLevel` from `[options]`.
+    pub siglevel: SigLevelSetting,
     /// Non-fatal config problems to print as warnings.
     pub warnings: Vec<String>,
 }
@@ -82,6 +89,7 @@ impl Config {
             verbose_pkg_lists: false,
             parallel_downloads: 5,
             disable_dl_timeout: false,
+            siglevel: SigLevelSetting::default(),
             warnings: Vec::new(),
             home,
         }
@@ -135,6 +143,12 @@ impl Config {
             .collect()
     }
 
+    /// Effective signature level of `repo`: its own `SigLevel` over the global one,
+    /// over the built-in default (`Required`).
+    pub fn siglevel_for(&self, repo: &Repo) -> SigLevel {
+        repo.siglevel.over(self.siglevel.over(SigLevel::default()))
+    }
+
     /// Whether colors are enabled for this run.
     pub fn use_color(&self, mode: Option<ColorMode>, is_tty: bool) -> bool {
         match mode {
@@ -155,6 +169,7 @@ pub fn default_repos(env: &str) -> Vec<Repo> {
             "https://mirror.msys2.org/mingw/$repo/".into(),
             "https://repo.msys2.org/mingw/$repo/".into(),
         ],
+        siglevel: SigLevelSetting::default(),
     };
     let msys = Repo {
         name: "msys".into(),
@@ -162,6 +177,7 @@ pub fn default_repos(env: &str) -> Vec<Repo> {
             "https://mirror.msys2.org/msys/$arch/".into(),
             "https://repo.msys2.org/msys/$arch/".into(),
         ],
+        siglevel: SigLevelSetting::default(),
     };
     vec![mingw(env), msys]
 }

@@ -8,8 +8,8 @@ into `~/.local`, so you never need an administrator shell. Commands and options 
 paku is not affiliated with MSYS2, Arch Linux's pacman or Git for Windows.
 
 > **Status: early development.** Refreshing, searching, installing, upgrading and removing packages
-> work (`-Sy`, `-Ss`, `-Si`, `-Sl`, `-Sg`, `-S <package>`, `-Syu`, `-R`, `-Q`, `-T`). Package
-> signatures are not verified yet (only SHA-256 checksums). Replacing packages (`Replaces`) and
+> work (`-Sy`, `-Ss`, `-Si`, `-Sl`, `-Sg`, `-S <package>`, `-Syu`, `-R`, `-Q`, `-T`), and database
+> and package signatures are verified against the MSYS2 keyring. Replacing packages (`Replaces`) and
 > saving modified config files as `.pacsave` are not implemented yet.
 
 ## Key features
