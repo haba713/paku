@@ -28,7 +28,7 @@ paku -Rs rsync          # remove
 
 ## Status
 
-Early development: install, upgrade, remove and signature checks work; see the
+Usable for daily work: install, upgrade, remove and signature checks work. See the
 [documentation](https://haba713.github.io/paku/configuration.html#limitations) for what is missing.
 paku is not affiliated with MSYS2, Arch Linux's pacman or Git for Windows.
 

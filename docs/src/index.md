@@ -7,7 +7,7 @@ into `~/.local`, so you never need an administrator shell. Commands and options 
 
 paku is not affiliated with MSYS2, Arch Linux's pacman or Git for Windows.
 
-> **Status: early development.** Install, upgrade, remove and signature checks work; see
+> **Status: usable for daily work.** Install, upgrade, remove and signature checks work; see
 > [Limitations](configuration.md#limitations) for what is missing.
 
 ## Key features

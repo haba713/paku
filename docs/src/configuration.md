@@ -108,6 +108,7 @@ Downloads use Windows' built-in WinHTTP, so the system's certificates and proxy 
   mingw packages.
 - `.pc` files, `*-config` scripts and libtool `.la` files contain hardcoded `/ucrt64` paths; paku
   does not rewrite them.
-- Install scriptlets (`.INSTALL`) assume `/` is the MSYS2 root. A failing scriptlet is a warning,
-  not an abort; `--noscriptlet` skips them.
+- Install scriptlets (`.INSTALL`) are not run yet; paku prints a warning for packages that have one.
+- Not implemented yet: `-U` (install local package files), `-D`, `-F`, `-Sc`, and the `-Q` options
+  `-g`, `-k`, `-c`, `-p` and `-t`.
 - Release binaries are not code-signed yet; Smart App Control may block them.
