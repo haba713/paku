@@ -127,3 +127,31 @@ fn lost_optdepends_are_reported() {
         [("tool".to_string(), "lib: extra feature".to_string())]
     );
 }
+
+fn replacement_breaks(provides: &[&str]) -> Vec<Missing> {
+    let l = local();
+    let newlib = PkgMeta {
+        name: "newlib".into(),
+        version: "1-1".into(),
+        provides: provides.iter().map(|s| s.to_string()).collect(),
+        ..PkgMeta::default()
+    };
+    broken_by_replacement(&l, &targets(&l, &["lib"]), &[&newlib], &|_| false)
+}
+
+#[test]
+fn replacement_that_provides_the_old_name_breaks_nothing() {
+    assert!(replacement_breaks(&["lib"]).is_empty());
+}
+
+#[test]
+fn replacement_without_provides_breaks_dependents() {
+    assert_eq!(
+        replacement_breaks(&[]),
+        [Missing {
+            target: "app".into(),
+            depend: "lib".into(),
+            causing: "lib".into(),
+        }]
+    );
+}

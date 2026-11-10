@@ -8,20 +8,25 @@ use std::fmt::Write;
 
 use alpm::resolve::Candidate;
 
+use super::Transaction;
 use crate::session::Session;
 use crate::ui::color::colors;
 use crate::ui::display::{humanize_size, list_display};
 use crate::ui::prompt::yesno;
 
-/// Prints `Packages (N) ...` and the totals, then asks to proceed.
-pub fn confirm(s: &Session, plan: &[Candidate]) -> bool {
+/// Prints `Packages (N) ...` and the totals, then asks to proceed. Replaced
+/// packages are listed as `name-version [removal]`.
+pub fn confirm(s: &Session, t: &Transaction) -> bool {
+    let plan = &t.plan;
     let mut out = String::new();
-    let names: Vec<String> = plan
+    let installs = plan.iter().map(|c| format!("{}-{}", c.pkg.name, c.pkg.version));
+    let removals = t
+        .removes
         .iter()
-        .map(|c| format!("{}-{}", c.pkg.name, c.pkg.version))
-        .collect();
+        .map(|p| format!("{}-{} [removal]", p.meta.name, p.meta.version));
+    let names: Vec<String> = installs.chain(removals).collect();
     out.push('\n');
-    list_display(&mut out, &format!("Packages ({})", plan.len()), &names, s.cols);
+    list_display(&mut out, &format!("Packages ({})", names.len()), &names, s.cols);
     out.push('\n');
     let download: u64 = plan.iter().filter(|c| !is_cached(s, c)).map(|c| c.pkg.csize).sum();
     let installed: u64 = plan.iter().map(|c| c.pkg.isize).sum();

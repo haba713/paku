@@ -7,6 +7,8 @@
 mod commit;
 mod confirm;
 
+pub(super) use commit::remove_all;
+
 use alpm::db::git_provided::is_core_package;
 use alpm::db::local::LocalPkg;
 use alpm::deps::satisfies;
@@ -102,11 +104,11 @@ fn flags(s: &Session) -> Flags {
 }
 
 /// Dependencies satisfied by Git for Windows (its bundle and core packages).
-fn provided(s: &Session, dep: &Depend) -> bool {
+pub(super) fn provided(s: &Session, dep: &Depend) -> bool {
     is_core_package(&dep.name) || s.git.packages().iter().any(|(n, v)| satisfies(dep, n, v, &[]))
 }
 
-fn broken(missing: &[Missing]) -> i32 {
+pub(super) fn broken(missing: &[Missing]) -> i32 {
     msg::error("failed to prepare transaction (could not satisfy dependencies)");
     for m in missing {
         msg::colon(&format!(

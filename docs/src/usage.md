@@ -41,6 +41,9 @@ paku -S rsync           # install it and its missing dependencies
 
 Combined short flags work as in pacman (`-Syu`, `-Qqe`, `-Rns`), and `-` reads targets from stdin.
 
+When MSYS2 renames or merges a package, `paku -Syu` asks `Replace <old> with <repo>/<new>?` and, on
+yes, removes the old package and installs the new one, like pacman.
+
 ## Package names
 
 | Repository   | Host CPU | Package name prefix        |

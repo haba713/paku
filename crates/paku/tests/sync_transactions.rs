@@ -17,6 +17,9 @@ struct Pkg {
     files: &'static [(&'static str, &'static [u8])],
     /// Config files (`backup = ...`), relative to the prefix like `files`.
     backup: &'static [&'static str],
+    replaces: &'static [&'static str],
+    provides: &'static [&'static str],
+    conflicts: &'static [&'static str],
 }
 
 struct Fixture {
@@ -88,6 +91,15 @@ fn write_pkg(repo: &Path, p: &Pkg) -> PathBuf {
     for path in p.backup {
         info.push_str(&format!("backup = ucrt64/{path}\n"));
     }
+    for (key, values) in [
+        ("replaces", p.replaces),
+        ("provides", p.provides),
+        ("conflict", p.conflicts),
+    ] {
+        for v in values {
+            info.push_str(&format!("{key} = {v}\n"));
+        }
+    }
     add(&mut b, ".PKGINFO", info.as_bytes());
     add_dirs(&mut b, p.files);
     for (path, data) in p.files {
@@ -106,8 +118,14 @@ fn desc(p: &Pkg, file: &Path) -> String {
         "%FILENAME%\n{fname}\n\n%NAME%\n{}\n\n%VERSION%\n{}\n\n%CSIZE%\n{size}\n\n%SHA256SUM%\n{sha}\n\n%ARCH%\nany\n\n",
         p.name, p.version
     );
-    if !p.depends.is_empty() {
-        s.push_str(&format!("%DEPENDS%\n{}\n\n", p.depends.join("\n")));
+    let lists = [
+        ("DEPENDS", p.depends),
+        ("REPLACES", p.replaces),
+        ("PROVIDES", p.provides),
+        ("CONFLICTS", p.conflicts),
+    ];
+    for (key, values) in lists.iter().filter(|(_, v)| !v.is_empty()) {
+        s.push_str(&format!("%{key}%\n{}\n\n", values.join("\n")));
     }
     s
 }
@@ -157,6 +175,9 @@ const APP: Pkg = Pkg {
     depends: &["lib"],
     files: &[("bin/app.exe", b"app")],
     backup: &[],
+    replaces: &[],
+    provides: &[],
+    conflicts: &[],
 };
 const LIB: Pkg = Pkg {
     name: "lib",
@@ -164,6 +185,9 @@ const LIB: Pkg = Pkg {
     depends: &[],
     files: &[("bin/lib.dll", b"lib")],
     backup: &[],
+    replaces: &[],
+    provides: &[],
+    conflicts: &[],
 };
 
 #[test]
@@ -342,6 +366,9 @@ const TOOL: Pkg = Pkg {
     depends: &[],
     files: &[("etc/tool.conf", b"v1"), ("etc/defaults.conf", b"v1")],
     backup: &["etc/tool.conf", "etc/defaults.conf"],
+    replaces: &[],
+    provides: &[],
+    conflicts: &[],
 };
 const TOOL2: Pkg = Pkg {
     version: "2.0-1",
@@ -409,4 +436,81 @@ fn noupgrade_file_is_left_alone() {
     assert!(out.status.success(), "{}", text(&out));
     assert_eq!(fs::read(f.root().join("bin/lib.dll")).unwrap(), b"lib");
     assert_eq!(fs::read(f.root().join("bin/lib.dll.pacnew")).unwrap(), b"lib3");
+}
+
+/// `lib` renamed to `newlib`, which takes over `bin/lib.dll`.
+const NEWLIB: Pkg = Pkg {
+    name: "newlib",
+    version: "3.0-1",
+    depends: &[],
+    files: &[("bin/lib.dll", b"new"), ("bin/newlib.dll", b"x")],
+    backup: &[],
+    replaces: &["lib"],
+    provides: &["lib"],
+    conflicts: &["lib"],
+};
+
+#[test]
+fn sysupgrade_replaces_renamed_package() {
+    let f = Fixture::new(&[APP, LIB]);
+    f.paku(&["-Sy"]);
+    assert!(f.paku(&["-S", "app"]).status.success());
+
+    f.publish(&[APP, NEWLIB]);
+    let out = f.paku(&["-Syu"]);
+    let t = text(&out);
+    assert!(out.status.success(), "{t}");
+    assert!(t.contains(":: Replace lib with test/newlib? [Y/n]"), "{t}");
+    assert!(t.contains("lib-2.0-1 [removal]"), "{t}");
+    assert!(t.contains("(1/1) removing lib"), "{t}");
+    assert!(t.contains("(1/1) installing newlib"), "{t}");
+
+    let q = f.paku(&["-Q"]);
+    assert_eq!(String::from_utf8_lossy(&q.stdout), "app 1.0-1\nnewlib 3.0-1\n");
+    let deps = f.paku(&["-Qqd"]);
+    assert_eq!(String::from_utf8_lossy(&deps.stdout), "newlib\n", "reason is inherited");
+    assert_eq!(fs::read(f.root().join("bin/lib.dll")).unwrap(), b"new");
+    assert!(f.root().join("bin/newlib.dll").is_file());
+    let log = fs::read_to_string(f.root().join("share/paku/paku.log")).unwrap();
+    assert!(log.contains("[ALPM] removed lib (2.0-1)"), "{log}");
+    assert!(log.contains("[ALPM] installed newlib (3.0-1)"), "{log}");
+}
+
+#[test]
+fn replacement_breaking_a_dependency_is_refused() {
+    let f = Fixture::new(&[APP, LIB]);
+    f.paku(&["-Sy"]);
+    assert!(f.paku(&["-S", "app"]).status.success());
+    const NO_PROVIDES: Pkg = Pkg {
+        provides: &[],
+        ..NEWLIB
+    };
+    f.publish(&[APP, NO_PROVIDES]);
+    let out = f.paku(&["-Syu"]);
+    let t = text(&out);
+    assert!(!out.status.success(), "{t}");
+    assert!(
+        t.contains(":: removing lib breaks dependency 'lib' required by app"),
+        "{t}"
+    );
+    assert_eq!(fs::read(f.root().join("bin/lib.dll")).unwrap(), b"lib");
+    let q = f.paku(&["-Q"]);
+    assert_eq!(String::from_utf8_lossy(&q.stdout), "app 1.0-1\nlib 2.0-1\n");
+}
+
+#[test]
+fn ignored_replacement_is_skipped_with_a_warning() {
+    let f = Fixture::new(&[APP, LIB]);
+    f.paku(&["-Sy"]);
+    assert!(f.paku(&["-S", "app"]).status.success());
+    f.publish(&[APP, NEWLIB]);
+    let out = f.paku(&["-Syu", "--ignore", "newlib"]);
+    let t = text(&out);
+    assert!(out.status.success(), "{t}");
+    assert!(
+        t.contains("ignoring package replacement (lib-2.0-1 => newlib-3.0-1)"),
+        "{t}"
+    );
+    let q = f.paku(&["-Q"]);
+    assert_eq!(String::from_utf8_lossy(&q.stdout), "app 1.0-1\nlib 2.0-1\n");
 }

@@ -111,4 +111,3 @@ Downloads use Windows' built-in WinHTTP, so the system's certificates and proxy 
 - Install scriptlets (`.INSTALL`) assume `/` is the MSYS2 root. A failing scriptlet is a warning,
   not an abort; `--noscriptlet` skips them.
 - Release binaries are not code-signed yet; Smart App Control may block them.
-- Not implemented yet: replacing packages (`Replaces`).

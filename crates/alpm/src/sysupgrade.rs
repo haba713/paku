@@ -32,45 +32,72 @@ pub enum Outcome<'a> {
         repo: &'a str,
         sync: String,
     },
-    /// A sync package declares that it replaces an installed one.
-    Replaced { old: String, by: Candidate<'a> },
+    /// A sync package replaces an installed one: install `by`, remove `old`.
+    Replaced { old: &'a LocalPkg, by: Candidate<'a> },
+    /// A replacement skipped because of `IgnorePkg` / `IgnoreGroup`.
+    IgnoredReplacement { old: &'a LocalPkg, by: Candidate<'a> },
 }
 
-/// Compares every installed package with the first sync database that has it.
+/// Choices the front-end makes during a full upgrade.
+#[derive(Clone, Copy)]
+pub struct Policy<'p> {
+    /// `-uu`: also move to older repository versions.
+    pub downgrade: bool,
+    /// `IgnorePkg` / `IgnoreGroup`.
+    pub ignored: &'p dyn Fn(&PkgMeta) -> bool,
+    /// Asked before an installed package is replaced by a sync package.
+    pub replace: &'p dyn Fn(&LocalPkg, &Candidate) -> bool,
+}
+
+/// Checks every installed package against the first sync database that has a
+/// replacement for it or, failing that, a package of the same name.
 ///
-/// `skip` names packages already in the transaction; `ignored` applies
-/// `IgnorePkg` / `IgnoreGroup`; `downgrade` is `-uu`.
-pub fn sysupgrade<'a>(
-    local: &[LocalPkg],
-    dbs: &'a [SyncDb],
-    skip: &[&str],
-    downgrade: bool,
-    ignored: &dyn Fn(&PkgMeta) -> bool,
-) -> Vec<Outcome<'a>> {
+/// `skip` names packages already in the transaction.
+pub fn sysupgrade<'a>(local: &'a [LocalPkg], dbs: &'a [SyncDb], skip: &[&str], policy: &Policy) -> Vec<Outcome<'a>> {
     let mut out = Vec::new();
     for lpkg in local.iter().filter(|l| !skip.contains(&l.meta.name.as_str())) {
-        if let Some(by) = replacer(lpkg, dbs, ignored) {
-            out.push(Outcome::Replaced {
-                old: lpkg.meta.name.clone(),
-                by,
-            });
-        }
-        let literal = dbs
-            .iter()
-            .find_map(|db| db.find(&lpkg.meta.name).map(|pkg| Candidate { repo: db.name(), pkg }));
-        if let Some(c) = literal.and_then(|c| check_literal(lpkg, c, downgrade, ignored)) {
-            out.push(c);
+        for db in dbs {
+            if check_replacers(lpkg, db, policy, &mut out) {
+                break;
+            }
+            if let Some(pkg) = db.find(&lpkg.meta.name) {
+                out.extend(check_literal(lpkg, Candidate { repo: db.name(), pkg }, policy));
+                break;
+            }
         }
     }
     out
 }
 
-fn check_literal<'a>(
-    lpkg: &LocalPkg,
-    c: Candidate<'a>,
-    downgrade: bool,
-    ignored: &dyn Fn(&PkgMeta) -> bool,
-) -> Option<Outcome<'a>> {
+/// Adds the outcome for every package in `db` that replaces `lpkg`. Returns
+/// whether a replacement was accepted, which ends the search for `lpkg`.
+fn check_replacers<'a>(lpkg: &'a LocalPkg, db: &'a SyncDb, policy: &Policy, out: &mut Vec<Outcome<'a>>) -> bool {
+    let mut accepted = false;
+    let replacers = db
+        .packages()
+        .iter()
+        .filter(|p| p.name != lpkg.meta.name && replaces(p, lpkg));
+    for pkg in replacers {
+        let by = Candidate { repo: db.name(), pkg };
+        if (policy.ignored)(pkg) || (policy.ignored)(&lpkg.meta) {
+            out.push(Outcome::IgnoredReplacement { old: lpkg, by });
+        } else if (policy.replace)(lpkg, &by) {
+            out.push(Outcome::Replaced { old: lpkg, by });
+            accepted = true;
+        }
+    }
+    accepted
+}
+
+/// Whether one of `pkg`'s `replaces` entries names `lpkg` (provides don't count).
+fn replaces(pkg: &PkgMeta, lpkg: &LocalPkg) -> bool {
+    pkg.replaces
+        .iter()
+        .any(|r| satisfies(&Depend::parse(r), &lpkg.meta.name, &lpkg.meta.version, &[]))
+}
+
+fn check_literal<'a>(lpkg: &LocalPkg, c: Candidate<'a>, policy: &Policy) -> Option<Outcome<'a>> {
+    let (downgrade, ignored) = (policy.downgrade, policy.ignored);
     let cmp = vercmp(&c.pkg.version, &lpkg.meta.version);
     if cmp.is_eq() || (cmp.is_lt() && !downgrade) {
         return cmp.is_lt().then(|| Outcome::LocalNewer {
@@ -89,19 +116,6 @@ fn check_literal<'a>(
         });
     }
     Some(Outcome::Upgrade(c))
-}
-
-/// The first non-ignored sync package whose `replaces` matches `lpkg`.
-fn replacer<'a>(lpkg: &LocalPkg, dbs: &'a [SyncDb], ignored: &dyn Fn(&PkgMeta) -> bool) -> Option<Candidate<'a>> {
-    dbs.iter()
-        .flat_map(|db| db.packages().iter().map(move |pkg| Candidate { repo: db.name(), pkg }))
-        .filter(|c| c.pkg.name != lpkg.meta.name && !ignored(c.pkg))
-        .find(|c| {
-            c.pkg
-                .replaces
-                .iter()
-                .any(|r| satisfies(&Depend::parse(r), &lpkg.meta.name, &lpkg.meta.version, &[]))
-        })
 }
 
 #[cfg(test)]
@@ -144,16 +158,27 @@ mod tests {
             .collect()
     }
 
+    /// Plain upgrade policy; `ignore` names the one package in `IgnorePkg`.
+    fn run<'a>(
+        lpkgs: &'a [LocalPkg],
+        dbs: &'a [SyncDb],
+        skip: &[&str],
+        downgrade: bool,
+        ignore: &str,
+    ) -> Vec<Outcome<'a>> {
+        let policy = Policy {
+            downgrade,
+            ignored: &|p| p.name == ignore,
+            replace: &|_, _| true,
+        };
+        sysupgrade(lpkgs, dbs, skip, &policy)
+    }
+
     #[test]
     fn newer_versions_are_upgraded_and_equal_ones_skipped() {
         let dbs = vec![db("r", vec![meta("a", "2-1"), meta("b", "1-1")])];
-        let out = sysupgrade(
-            &local(&[("a", "1-1"), ("b", "1-1"), ("foreign", "1-1")]),
-            &dbs,
-            &[],
-            false,
-            &|_| false,
-        );
+        let lpkgs = local(&[("a", "1-1"), ("b", "1-1"), ("foreign", "1-1")]);
+        let out = run(&lpkgs, &dbs, &[], false, "");
         assert_eq!(upgraded(&out), ["a-2-1"]);
         assert_eq!(out.len(), 1);
     }
@@ -161,17 +186,17 @@ mod tests {
     #[test]
     fn first_repository_wins() {
         let dbs = vec![db("one", vec![meta("a", "1-1")]), db("two", vec![meta("a", "9-1")])];
-        let out = sysupgrade(&local(&[("a", "1-1")]), &dbs, &[], false, &|_| false);
-        assert!(out.is_empty());
+        let lpkgs = local(&[("a", "1-1")]);
+        assert!(run(&lpkgs, &dbs, &[], false, "").is_empty());
     }
 
     #[test]
     fn older_repo_version_warns_or_downgrades() {
         let dbs = vec![db("r", vec![meta("a", "1-1")])];
         let lpkgs = local(&[("a", "2-1")]);
-        let out = sysupgrade(&lpkgs, &dbs, &[], false, &|_| false);
+        let out = run(&lpkgs, &dbs, &[], false, "");
         assert!(matches!(&out[..], [Outcome::LocalNewer { repo: "r", .. }]));
-        let out = sysupgrade(&lpkgs, &dbs, &[], true, &|_| false);
+        let out = run(&lpkgs, &dbs, &[], true, "");
         assert_eq!(upgraded(&out), ["a-1-1"]);
     }
 
@@ -179,17 +204,48 @@ mod tests {
     fn ignored_and_skipped_packages_are_not_upgraded() {
         let dbs = vec![db("r", vec![meta("a", "2-1"), meta("b", "2-1")])];
         let lpkgs = local(&[("a", "1-1"), ("b", "1-1")]);
-        let out = sysupgrade(&lpkgs, &dbs, &["b"], false, &|p| p.name == "a");
+        let out = run(&lpkgs, &dbs, &["b"], false, "a");
         assert!(matches!(&out[..], [Outcome::Ignored { downgrade: false, .. }]));
     }
 
-    #[test]
-    fn replacements_are_reported() {
+    /// `new` replaces `old<2`; the repository still carries a newer `old`.
+    fn replacing_dbs() -> Vec<SyncDb> {
         let mut new = meta("new", "1-1");
         new.replaces = vec!["old<2".into()];
-        let dbs = vec![db("r", vec![new, meta("old", "3-1")])];
-        let out = sysupgrade(&local(&[("old", "1-1")]), &dbs, &[], false, &|_| false);
-        assert!(matches!(&out[0], Outcome::Replaced { old, by } if old == "old" && by.pkg.name == "new"));
+        vec![db("r", vec![new, meta("old", "3-1")])]
+    }
+
+    #[test]
+    fn replacement_wins_over_upgrade() {
+        let dbs = replacing_dbs();
+        let lpkgs = local(&[("old", "1-1")]);
+        let out = run(&lpkgs, &dbs, &[], false, "");
+        assert!(matches!(
+            &out[..],
+            [Outcome::Replaced { old, by }] if old.meta.name == "old" && by.pkg.name == "new"
+        ));
+    }
+
+    #[test]
+    fn replaces_respects_version_constraint() {
+        let dbs = replacing_dbs();
+        let lpkgs = local(&[("old", "2-1")]);
+        assert_eq!(upgraded(&run(&lpkgs, &dbs, &[], false, "")), ["old-3-1"]);
+    }
+
+    #[test]
+    fn declined_or_ignored_replacement_falls_back_to_upgrade() {
+        let dbs = replacing_dbs();
+        let lpkgs = local(&[("old", "1-1")]);
+        let declined = Policy {
+            downgrade: false,
+            ignored: &|_| false,
+            replace: &|_, _| false,
+        };
+        assert_eq!(upgraded(&sysupgrade(&lpkgs, &dbs, &[], &declined)), ["old-3-1"]);
+
+        let out = run(&lpkgs, &dbs, &[], false, "new");
+        assert!(matches!(&out[0], Outcome::IgnoredReplacement { by, .. } if by.pkg.name == "new"));
         assert_eq!(upgraded(&out), ["old-3-1"]);
     }
 }

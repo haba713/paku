@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "alpm"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "flate2",
  "httpdate",
@@ -194,7 +194,7 @@ dependencies = [
 
 [[package]]
 name = "paku"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "alpm",
  "paku-formats",
@@ -205,7 +205,7 @@ dependencies = [
 
 [[package]]
 name = "paku-formats"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "flate2",
  "lzma-rs",
@@ -216,14 +216,14 @@ dependencies = [
 
 [[package]]
 name = "paku-layout"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "paku-platform"
-version = "0.3.0"
+version = "0.4.0"
 
 [[package]]
 name = "proc-macro2"

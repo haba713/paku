@@ -33,17 +33,20 @@ pub struct Conflict {
 }
 
 /// Finds conflicts between the planned packages, installed packages and the disk.
-/// Files of packages being replaced (same name) are not conflicts. `overwrite`
-/// holds `--overwrite` globs, matched against `/<path>`.
+/// Files of packages being upgraded (same name) or removed in this transaction
+/// (`removing`) are not conflicts. `overwrite` holds `--overwrite` globs, matched
+/// against `/<path>`.
 pub fn find_conflicts(
     planned: &[PlannedFiles],
+    removing: &[&str],
     local: &LocalDb,
     layout: &Layout,
     overwrite: &[String],
 ) -> Vec<Conflict> {
     let mut owners: HashMap<String, String> = HashMap::new();
     for pkg in local.packages() {
-        if planned.iter().any(|p| p.name == pkg.meta.name) {
+        let name = pkg.meta.name.as_str();
+        if removing.contains(&name) || planned.iter().any(|p| p.name == name) {
             continue;
         }
         for f in pkg.files.iter().filter(|f| !f.ends_with('/')) {
@@ -148,7 +151,7 @@ mod tests {
         let planned = [PlannedFiles { name: "rg", files: &f }];
         let local = LocalDb::default();
 
-        let c = find_conflicts(&planned, &local, &layout, &[]);
+        let c = find_conflicts(&planned, &[], &local, &layout, &[]);
         assert_eq!(
             c,
             [Conflict {
@@ -157,7 +160,7 @@ mod tests {
                 owner: None
             }]
         );
-        assert!(find_conflicts(&planned, &local, &layout, &["/bin/*".into()]).is_empty());
+        assert!(find_conflicts(&planned, &[], &local, &layout, &["/bin/*".into()]).is_empty());
     }
 
     #[test]
@@ -169,7 +172,7 @@ mod tests {
             PlannedFiles { name: "a", files: &a },
             PlannedFiles { name: "b", files: &b },
         ];
-        let c = find_conflicts(&planned, &LocalDb::default(), &layout, &[]);
+        let c = find_conflicts(&planned, &[], &LocalDb::default(), &layout, &[]);
         assert_eq!(c.len(), 1);
         assert_eq!(c[0].owner.as_deref(), Some("a"));
     }

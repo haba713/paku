@@ -17,13 +17,15 @@ use alpm::vercmp;
 use paku_layout::Layout;
 use paku_platform::TempDir;
 
-use super::super::warn_logged;
-use super::notes;
+use super::super::{remove, warn_logged};
+use super::{Transaction, notes};
 use crate::session::Session;
 use crate::ui::msg;
 
-/// Stages every package, checks file conflicts, then installs them in order.
-pub fn install(s: &Session, plan: &[Candidate], files: &[PathBuf], explicit: &[Candidate]) -> i32 {
+/// Stages every package, checks file conflicts, removes replaced packages, then
+/// installs the new ones in order.
+pub fn install(s: &Session, t: &Transaction, files: &[PathBuf]) -> i32 {
+    let plan = &t.plan;
     let layout = s.layout();
     let staging = match TempDir::new_in(&s.conf.prefix, ".paku-staging-") {
         Ok(t) => t,
@@ -37,13 +39,16 @@ pub fn install(s: &Session, plan: &[Candidate], files: &[PathBuf], explicit: &[C
         return 1;
     };
     println!("checking for file conflicts...");
-    if !conflicts_ok(s, &layout, plan, &extracted) {
+    if !conflicts_ok(s, &layout, t, &extracted) {
         return 1;
     }
     msg::colon("Processing package changes...");
+    if !t.removes.is_empty() && remove::remove_all(s, &t.removes) != 0 {
+        return 1;
+    }
     for (i, (c, x)) in plan.iter().zip(&extracted).enumerate() {
         println!("({}/{}) {} {}", i + 1, plan.len(), action(s, c), c.pkg.name);
-        let is_explicit = explicit.iter().any(|e| e.pkg.name == c.pkg.name);
+        let is_explicit = t.explicit.iter().any(|e| e.pkg.name == c.pkg.name);
         if let Err(e) = install_one(s, &layout, &staging.path().join(i.to_string()), c, x, is_explicit) {
             msg::error(&format!("failed to install {}: {e}", c.pkg.name));
             return 1;
@@ -67,8 +72,9 @@ fn stage_all(layout: &Layout, files: &[PathBuf], staging: &Path) -> Option<Vec<E
     Some(out)
 }
 
-fn conflicts_ok(s: &Session, layout: &Layout, plan: &[Candidate], extracted: &[Extracted]) -> bool {
-    let planned: Vec<PlannedFiles> = plan
+fn conflicts_ok(s: &Session, layout: &Layout, t: &Transaction, extracted: &[Extracted]) -> bool {
+    let planned: Vec<PlannedFiles> = t
+        .plan
         .iter()
         .zip(extracted)
         .map(|(c, x)| PlannedFiles {
@@ -76,7 +82,8 @@ fn conflicts_ok(s: &Session, layout: &Layout, plan: &[Candidate], extracted: &[E
             files: &x.files,
         })
         .collect();
-    let conflicts = find_conflicts(&planned, &s.local, layout, &s.args.overwrite);
+    let removing: Vec<&str> = t.removes.iter().map(|p| p.meta.name.as_str()).collect();
+    let conflicts = find_conflicts(&planned, &removing, &s.local, layout, &s.args.overwrite);
     if conflicts.is_empty() {
         return true;
     }

@@ -8,6 +8,7 @@
 mod commit;
 mod confirm;
 mod notes;
+mod replace;
 mod signatures;
 mod targets;
 mod upgrades;
@@ -15,6 +16,7 @@ mod upgrades;
 use std::path::PathBuf;
 
 use alpm::db::git_provided::is_core_package;
+use alpm::db::local::LocalPkg;
 use alpm::deps::satisfies;
 use alpm::download::fetch_package;
 use alpm::lock::DbLock;
@@ -23,6 +25,16 @@ use paku_formats::depend::Depend;
 
 use crate::session::Session;
 use crate::ui::msg;
+
+/// What an install transaction changes.
+struct Transaction<'a> {
+    /// Packages to install, dependencies first.
+    plan: Vec<Candidate<'a>>,
+    /// Those of `plan` to record as explicitly installed.
+    explicit: Vec<Candidate<'a>>,
+    /// Installed packages that `plan` replaces; removed before installing.
+    removes: Vec<&'a LocalPkg>,
+}
 
 /// Runs an install transaction for the command-line targets.
 pub fn run(s: &Session) -> i32 {
@@ -35,8 +47,11 @@ pub fn run(s: &Session) -> i32 {
         return 1;
     }
     let mut wanted = targets.packages.clone();
+    let mut replaced = Vec::new();
     if s.args.sysupgrade > 0 {
-        wanted.extend(upgrades::collect(s, &targets.packages));
+        let upgrades = upgrades::collect(s, &targets.packages);
+        wanted.extend(upgrades.packages);
+        replaced = upgrades.replaced;
     }
     if wanted.is_empty() {
         println!(" there is nothing to do");
@@ -53,32 +68,37 @@ pub fn run(s: &Session) -> i32 {
             return 1;
         }
     };
-    if !valid_arch(s, &plan) || !no_package_conflicts(s, &plan) {
+    let t = Transaction {
+        plan,
+        explicit: replace::explicit(&targets.packages, &replaced),
+        removes: replace::removals(&replaced),
+    };
+    if !valid_arch(s, &t.plan) || !no_package_conflicts(s, &t) || !replace::deps_ok(s, &t) {
         return 1;
     }
     if s.args.print {
-        confirm::print_targets(s, &plan);
+        confirm::print_targets(s, &t.plan);
         return 0;
     }
-    if !confirm::confirm(s, &plan) {
+    if !confirm::confirm(s, &t) {
         return 1;
     }
-    proceed(s, &plan, &targets.packages)
+    proceed(s, &t)
 }
 
 /// Download, then (unless `-w`) install.
-fn proceed(s: &Session, plan: &[Candidate], explicit: &[Candidate]) -> i32 {
-    let Some(files) = download(s, plan) else {
+fn proceed(s: &Session, t: &Transaction) -> i32 {
+    let Some(files) = download(s, &t.plan) else {
         return 1;
     };
     println!("checking package integrity...");
-    if !signatures::verify(s, plan, &files) {
+    if !signatures::verify(s, &t.plan, &files) {
         return 1;
     }
     if s.args.downloadonly {
         return 0;
     }
-    commit::install(s, plan, &files, explicit)
+    commit::install(s, t, &files)
 }
 
 /// Whether something installed (paku's packages or Git's bundle) satisfies `dep`.
@@ -137,15 +157,17 @@ fn valid_arch(s: &Session, plan: &[Candidate]) -> bool {
     bad.is_empty()
 }
 
-/// Declared `CONFLICTS` against installed packages (pacman would offer removal).
-fn no_package_conflicts(s: &Session, plan: &[Candidate]) -> bool {
+/// Declared `CONFLICTS` against installed packages that stay installed (pacman
+/// would offer removal). Packages being replaced are removed anyway.
+fn no_package_conflicts(s: &Session, t: &Transaction) -> bool {
     if !s.args.print {
         println!("looking for conflicting packages...");
     }
+    let stays = |l: &LocalPkg| !t.removes.iter().any(|r| r.meta.name == l.meta.name);
     let mut ok = true;
-    for c in plan {
+    for c in &t.plan {
         for conflict in c.pkg.conflicts.iter().map(|d| Depend::parse(d)) {
-            let hit = s.local.packages().iter().find(|l| {
+            let hit = s.local.packages().iter().filter(|l| stays(l)).find(|l| {
                 l.meta.name != c.pkg.name && satisfies(&conflict, &l.meta.name, &l.meta.version, &l.meta.provides)
             });
             if let Some(l) = hit {

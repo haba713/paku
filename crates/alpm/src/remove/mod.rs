@@ -10,6 +10,7 @@
 pub mod files;
 
 use paku_formats::depend::Depend;
+use paku_formats::meta::PkgMeta;
 
 use crate::db::local::{LocalPkg, Reason};
 use crate::deps::satisfies;
@@ -198,6 +199,41 @@ fn needed_optdepends(
                 && !provided(&dep);
             if lost {
                 out.push((lpkg.meta.name.clone(), opt.clone()));
+            }
+        }
+    }
+    out
+}
+
+/// Dependencies that break when `removed` packages are replaced by `added` ones
+/// (the `alpm_checkdeps` call of `_alpm_sync_prepare`). Checks every package of
+/// the resulting system: `added`, plus installed ones neither removed nor upgraded.
+pub fn broken_by_replacement(
+    local: &[LocalPkg],
+    removed: &[&LocalPkg],
+    added: &[&PkgMeta],
+    provided: &dyn Fn(&Depend) -> bool,
+) -> Vec<Missing> {
+    let upgraded = |l: &LocalPkg| added.iter().any(|a| a.name == l.meta.name);
+    let staying = local
+        .iter()
+        .filter(|l| !contains(removed, l) && !upgraded(l))
+        .map(|l| &l.meta);
+    let after: Vec<&PkgMeta> = added.iter().copied().chain(staying).collect();
+    let mut out = Vec::new();
+    for pkg in &after {
+        for dep_str in &pkg.depends {
+            let dep = Depend::parse(dep_str);
+            let Some(causing) = removed.iter().find(|r| sat(&dep, r)) else {
+                continue;
+            };
+            let kept = after.iter().any(|p| satisfies(&dep, &p.name, &p.version, &p.provides));
+            if !kept && !provided(&dep) {
+                out.push(Missing {
+                    target: pkg.name.clone(),
+                    depend: dep_str.clone(),
+                    causing: causing.meta.name.clone(),
+                });
             }
         }
     }
