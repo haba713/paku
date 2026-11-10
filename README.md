@@ -6,6 +6,8 @@ into `~/.local`, so you never need an elevated (administrator) shell. Commands a
 same as MSYS2 `pacman`: `paku -Syu`, `paku -S rsync`, `paku -Rs`, `paku -Qq`. paku is a single
 self-contained `paku.exe` written in Rust, for Windows x64 and ARM64.
 
+**Documentation:** <https://haba713.github.io/paku/>
+
 paku is not affiliated with MSYS2, Arch Linux's pacman or Git for Windows.
 
 > **Status: early development.** Refreshing, searching, installing, upgrading and removing packages
