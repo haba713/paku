@@ -29,7 +29,8 @@ main() {
     cd "$tmp"
 
     echo "Downloading $exe ..."
-    curl -fsSL -O "$url/$exe" -O "$url/SHA256SUMS"
+    curl -fsSL --retry 3 -O "$url/$exe"
+    curl -fsSL --retry 3 -O "$url/SHA256SUMS"
     grep " \*\{0,1\}$exe\$" SHA256SUMS | sha256sum -c --quiet -
 
     mkdir -p "$dir"
