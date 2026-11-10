@@ -1,5 +1,5 @@
 [book]
-title = "paku Documentation"
+title = "paku - pacman-style package manager for Windows Git Bash"
 description = "paku is pacman for Git Bash: install MSYS2 packages on Windows x64 and ARM64 per user into ~/.local, no admin rights."
 authors = ["haba713"]
 language = "en"
