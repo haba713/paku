@@ -7,10 +7,8 @@ into `~/.local`, so you never need an administrator shell. Commands and options 
 
 paku is not affiliated with MSYS2, Arch Linux's pacman or Git for Windows.
 
-> **Status: early development.** Refreshing, searching, installing, upgrading and removing packages
-> work (`-Sy`, `-Ss`, `-Si`, `-Sl`, `-Sg`, `-S <package>`, `-Syu`, `-R`, `-Q`, `-T`), and database
-> and package signatures are verified against the MSYS2 keyring. Replacing packages (`Replaces`) and
-> saving modified config files as `.pacsave` are not implemented yet.
+> **Status: early development.** Install, upgrade, remove and signature checks work; see
+> [Limitations](configuration.md#limitations) for what is missing.
 
 ## Key features
 
@@ -42,7 +40,7 @@ Next steps:
 
 ## More information
 
-- [README](https://github.com/haba713/paku#readme): project overview and build steps
+- [Source code](https://github.com/haba713/paku): GitHub repository
 - [AGENTS.md](https://github.com/haba713/paku/blob/master/AGENTS.md): architecture and conventions
 - [Issues](https://github.com/haba713/paku/issues): bug reports and feature requests
 - [License](https://github.com/haba713/paku/blob/master/LICENSE.md): GPL-2.0-or-later
