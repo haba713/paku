@@ -15,6 +15,8 @@ struct Pkg {
     version: &'static str,
     depends: &'static [&'static str],
     files: &'static [(&'static str, &'static [u8])],
+    /// Config files (`backup = ...`), relative to the prefix like `files`.
+    backup: &'static [&'static str],
 }
 
 struct Fixture {
@@ -82,6 +84,9 @@ fn write_pkg(repo: &Path, p: &Pkg) -> PathBuf {
     let mut info = format!("pkgname = {}\npkgver = {}\narch = any\nsize = 1\n", p.name, p.version);
     for d in p.depends {
         info.push_str(&format!("depend = {d}\n"));
+    }
+    for path in p.backup {
+        info.push_str(&format!("backup = ucrt64/{path}\n"));
     }
     add(&mut b, ".PKGINFO", info.as_bytes());
     add_dirs(&mut b, p.files);
@@ -151,12 +156,14 @@ const APP: Pkg = Pkg {
     version: "1.0-1",
     depends: &["lib"],
     files: &[("bin/app.exe", b"app")],
+    backup: &[],
 };
 const LIB: Pkg = Pkg {
     name: "lib",
     version: "2.0-1",
     depends: &[],
     files: &[("bin/lib.dll", b"lib")],
+    backup: &[],
 };
 
 #[test]
@@ -327,4 +334,79 @@ fn remove_cascade_takes_dependents() {
     assert!(out.status.success(), "{}", text(&out));
     assert!(f.paku(&["-Q"]).stdout.is_empty());
     assert!(!f.root().join("bin/app.exe").exists());
+}
+
+const TOOL: Pkg = Pkg {
+    name: "tool",
+    version: "1.0-1",
+    depends: &[],
+    files: &[("etc/tool.conf", b"v1"), ("etc/defaults.conf", b"v1")],
+    backup: &["etc/tool.conf", "etc/defaults.conf"],
+};
+const TOOL2: Pkg = Pkg {
+    version: "2.0-1",
+    files: &[("etc/tool.conf", b"v2"), ("etc/defaults.conf", b"v2")],
+    ..TOOL
+};
+
+#[test]
+fn edited_config_file_survives_upgrade_and_removal() {
+    let f = Fixture::new(&[TOOL]);
+    f.paku(&["-Sy"]);
+    assert!(f.paku(&["-S", "tool"]).status.success());
+    let etc = f.root().join("etc");
+    fs::write(etc.join("tool.conf"), b"mine").unwrap();
+
+    f.publish(&[TOOL2]);
+    let out = f.paku(&["-Syu"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(text(&out).contains("tool.conf.pacnew"), "{}", text(&out));
+    assert_eq!(fs::read(etc.join("tool.conf")).unwrap(), b"mine");
+    assert_eq!(fs::read(etc.join("tool.conf.pacnew")).unwrap(), b"v2");
+    assert_eq!(fs::read(etc.join("defaults.conf")).unwrap(), b"v2");
+    assert!(!etc.join("defaults.conf.pacnew").exists());
+
+    let out = f.paku(&["-R", "tool"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(text(&out).contains("tool.conf.pacsave"), "{}", text(&out));
+    assert_eq!(fs::read(etc.join("tool.conf.pacsave")).unwrap(), b"mine");
+    assert!(!etc.join("tool.conf").exists());
+    assert!(!etc.join("defaults.conf").exists());
+    let log = fs::read_to_string(f.root().join("share/paku/paku.log")).unwrap();
+    assert!(log.contains("[ALPM] warning: ") && log.contains(" saved as "), "{log}");
+}
+
+#[test]
+fn nosave_removes_edited_config_file() {
+    let f = Fixture::new(&[TOOL]);
+    f.paku(&["-Sy"]);
+    assert!(f.paku(&["-S", "tool"]).status.success());
+    fs::write(f.root().join("etc/tool.conf"), b"mine").unwrap();
+    let out = f.paku(&["-Rn", "tool"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(!f.root().join("etc").exists());
+}
+
+#[test]
+fn noupgrade_file_is_left_alone() {
+    let f = Fixture::new(&[LIB]);
+    fs::write(
+        f.dir.path().join("paku.conf"),
+        fs::read_to_string(f.dir.path().join("paku.conf"))
+            .unwrap()
+            .replace("[options]\n", "[options]\nNoUpgrade = bin/lib.dll\n"),
+    )
+    .unwrap();
+    f.paku(&["-Sy"]);
+    assert!(f.paku(&["-S", "lib"]).status.success());
+    const LIB3: Pkg = Pkg {
+        version: "3.0-1",
+        files: &[("bin/lib.dll", b"lib3")],
+        ..LIB
+    };
+    f.publish(&[LIB3]);
+    let out = f.paku(&["-Syu"]);
+    assert!(out.status.success(), "{}", text(&out));
+    assert_eq!(fs::read(f.root().join("bin/lib.dll")).unwrap(), b"lib");
+    assert_eq!(fs::read(f.root().join("bin/lib.dll.pacnew")).unwrap(), b"lib3");
 }

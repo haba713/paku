@@ -15,6 +15,7 @@ thiserror.workspace = true
 paku-platform.workspace = true
 sha2.workspace = true
 sha1.workspace = true
+md-5.workspace = true
 httpdate.workspace = true
 regex.workspace = true
 

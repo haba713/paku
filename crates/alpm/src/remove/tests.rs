@@ -14,6 +14,7 @@ fn pkg(name: &str, reason: Reason, depends: &[&str]) -> LocalPkg {
         reason,
         install_date: 0,
         files: Vec::new(),
+        backup: Vec::new(),
     }
 }
 

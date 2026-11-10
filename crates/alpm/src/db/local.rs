@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use paku_formats::desc::Desc;
 use paku_formats::meta::PkgMeta;
 
+use crate::backup::BackupFile;
 use crate::error::{Result, io_err};
 
 /// Local database schema version written to `ALPM_DB_VERSION`.
@@ -35,6 +36,8 @@ pub struct LocalPkg {
     pub install_date: i64,
     /// Installed files relative to the install prefix.
     pub files: Vec<String>,
+    /// Backup (configuration) files with their hashes as shipped.
+    pub backup: Vec<BackupFile>,
 }
 
 /// Installed packages read from disk.
@@ -87,10 +90,15 @@ fn read_pkg(dir: &Path) -> Result<Option<LocalPkg>> {
         return Ok(None);
     };
     let files_path = dir.join("files");
-    let files = match fs::read_to_string(&files_path) {
-        Ok(text) => Desc::parse(&text).get("FILES").to_vec(),
-        Err(_) => Vec::new(),
-    };
+    let files_desc = fs::read_to_string(&files_path)
+        .map(|text| Desc::parse(&text))
+        .unwrap_or_default();
+    let files = files_desc.get("FILES").to_vec();
+    let backup = files_desc
+        .get("BACKUP")
+        .iter()
+        .filter_map(|l| BackupFile::parse(l))
+        .collect();
     let reason = match desc.first("REASON") {
         Some("1") => Reason::Depend,
         _ => Reason::Explicit,
@@ -101,6 +109,7 @@ fn read_pkg(dir: &Path) -> Result<Option<LocalPkg>> {
         reason,
         install_date,
         files,
+        backup,
     }))
 }
 
@@ -115,6 +124,8 @@ pub struct NewEntry<'a> {
     pub install_date: i64,
     /// Installed files relative to the prefix.
     pub files: &'a [String],
+    /// Backup files with their hashes as shipped.
+    pub backup: &'a [BackupFile],
     /// Raw `.MTREE`.
     pub mtree: Option<&'a [u8]>,
     /// Raw `.INSTALL` scriptlet.
@@ -141,6 +152,7 @@ pub fn write_entry(dbpath: &Path, old_version: Option<&str>, entry: NewEntry) ->
     desc.set("VALIDATION", vec!["sha256".into()]);
     let mut files = Desc::default();
     files.set("FILES", entry.files.to_vec());
+    files.set("BACKUP", entry.backup.iter().map(BackupFile::to_line).collect());
     write(&dir.join("desc"), desc.to_text().as_bytes())?;
     write(&dir.join("files"), files.to_text().as_bytes())?;
     if let Some(m) = entry.mtree {
@@ -209,19 +221,24 @@ mod tests {
             version: "1~2.0-1".into(),
             ..PkgMeta::default()
         };
-        fn entry<'a>(meta: &'a PkgMeta, files: &'a [String]) -> NewEntry<'a> {
+        let backup = vec![BackupFile {
+            path: "etc/x.conf".into(),
+            hash: "abc".into(),
+        }];
+        fn entry<'a>(meta: &'a PkgMeta, files: &'a [String], backup: &'a [BackupFile]) -> NewEntry<'a> {
             NewEntry {
                 meta,
                 reason: Reason::Depend,
                 install_date: 42,
                 files,
+                backup,
                 mtree: Some(b"m"),
                 install: None,
             }
         }
-        write_entry(dir.path(), None, entry(&meta, &files)).unwrap();
+        write_entry(dir.path(), None, entry(&meta, &files, &backup)).unwrap();
         meta.version = "1~2.1-1".into();
-        write_entry(dir.path(), Some("1~2.0-1"), entry(&meta, &files)).unwrap();
+        write_entry(dir.path(), Some("1~2.0-1"), entry(&meta, &files, &backup)).unwrap();
 
         let db = LocalDb::load(dir.path()).unwrap();
         assert_eq!(db.packages().len(), 1);
@@ -231,6 +248,7 @@ mod tests {
             ("1~2.1-1", Reason::Depend, 42)
         );
         assert_eq!(x.files, files);
+        assert_eq!(x.backup, backup);
         assert!(dir.path().join("local/ALPM_DB_VERSION").is_file());
     }
 }

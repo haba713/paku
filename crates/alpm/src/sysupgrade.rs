@@ -124,6 +124,7 @@ mod tests {
                 reason: Reason::Explicit,
                 install_date: 0,
                 files: Vec::new(),
+                backup: Vec::new(),
             })
             .collect()
     }

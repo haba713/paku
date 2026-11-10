@@ -96,6 +96,16 @@ fn overwrite_allows(globs: &[String], path: &str) -> bool {
         .any(|g| glob_match(g.trim_start_matches('!'), &abs) && !g.starts_with('!'))
 }
 
+/// Whether `path` matches a pattern list such as `NoUpgrade`: the last matching
+/// pattern wins and a leading `!` negates (port of `_alpm_fnmatch_patterns`).
+pub fn matches_patterns(patterns: &[String], path: &str) -> bool {
+    patterns
+        .iter()
+        .rev()
+        .find(|p| glob_match(p.trim_start_matches('!'), path))
+        .is_some_and(|p| !p.starts_with('!'))
+}
+
 /// Minimal fnmatch: `*` matches any run (including `/`), `?` one character.
 pub fn glob_match(pattern: &str, text: &str) -> bool {
     let (p, t): (Vec<char>, Vec<char>) = (pattern.chars().collect(), text.chars().collect());
@@ -170,5 +180,14 @@ mod tests {
         assert!(glob_match("/bin/*.exe", "/bin/rg.exe"));
         assert!(glob_match("/bin/r?.EXE", "/bin/rg.exe"));
         assert!(!glob_match("/lib/*", "/bin/rg.exe"));
+    }
+
+    #[test]
+    fn pattern_lists_let_the_last_match_win() {
+        let list = files(&["etc/*", "!etc/keep.conf"]);
+        assert!(matches_patterns(&list, "etc/a.conf"));
+        assert!(!matches_patterns(&list, "etc/keep.conf"));
+        assert!(!matches_patterns(&list, "bin/a.exe"));
+        assert!(!matches_patterns(&[], "etc/a.conf"));
     }
 }

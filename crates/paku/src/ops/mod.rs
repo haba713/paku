@@ -28,6 +28,15 @@ fn not_implemented(op: Op) -> i32 {
     1
 }
 
+/// Prints a warning and records it in the log, as pacman does for `.pacnew` and
+/// `.pacsave` files.
+fn warn_logged(s: &Session, text: &str) {
+    msg::warning(text);
+    if let Err(e) = alpm::log::log_action(&s.conf.logfile, &format!("warning: {text}")) {
+        msg::warning(&e.to_string());
+    }
+}
+
 /// Splits `repo/name` targets.
 pub fn split_repo(target: &str) -> (Option<&str>, &str) {
     match target.split_once('/') {

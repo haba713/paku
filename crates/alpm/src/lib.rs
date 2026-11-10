@@ -5,6 +5,7 @@
 //!
 //! The library never prints or prompts; front-ends receive results and events.
 
+pub mod backup;
 pub mod checksum;
 pub mod db;
 pub mod deps;

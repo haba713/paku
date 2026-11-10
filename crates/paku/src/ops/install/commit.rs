@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use alpm::db::local::{NewEntry, Reason, write_entry};
-use alpm::install::commit::commit;
+use alpm::install::commit::{Committed, Request, commit};
 use alpm::install::conflict::{Conflict, PlannedFiles, find_conflicts};
 use alpm::install::extract::{Extracted, extract};
 use alpm::log::log_action;
@@ -17,6 +17,7 @@ use alpm::vercmp;
 use paku_layout::Layout;
 use paku_platform::TempDir;
 
+use super::super::warn_logged;
 use super::notes;
 use crate::session::Session;
 use crate::ui::msg;
@@ -109,20 +110,40 @@ fn install_one(
     is_explicit: bool,
 ) -> alpm::Result<()> {
     let old = s.local.find(&c.pkg.name);
-    let old_files = old.map(|o| o.files.clone()).unwrap_or_default();
-    let done = commit(staging, layout, &x.files, &old_files)?;
+    let request = Request {
+        files: &x.files,
+        backup: &x.backup,
+        old_files: old.map_or(&[], |o| &o.files),
+        old_backup: old.map_or(&[], |o| &o.backup),
+        no_upgrade: &s.conf.no_upgrade,
+    };
+    let done = commit(staging, layout, &request)?;
     let entry = NewEntry {
         meta: &x.meta,
         reason: reason(s, old.map(|o| o.reason), is_explicit),
         install_date: now(),
         files: &x.files,
+        backup: &done.backup,
         mtree: x.mtree.as_deref(),
         install: x.install.as_deref(),
     };
     write_entry(&s.conf.dbpath, old.map(|o| o.meta.version.as_str()), entry)?;
     log_action(&s.conf.logfile, &log_line(s, c))?;
+    warn_kept_configs(s, &done);
     warn_extras(s, c, x, &done.leftovers);
     Ok(())
+}
+
+/// Config files the user edited: the new version is next to them as `.pacnew`,
+/// or the edited file was saved as `.pacsave` because the package dropped it.
+fn warn_kept_configs(s: &Session, done: &Committed) {
+    for file in &done.pacnew {
+        let file = file.display();
+        warn_logged(s, &format!("{file} installed as {file}.pacnew"));
+    }
+    for (file, saved) in &done.pacsave {
+        warn_logged(s, &format!("{} saved as {}", file.display(), saved.display()));
+    }
 }
 
 /// `--asdeps`/`--asexplicit` win; reinstalls keep their reason; new dependencies are deps.

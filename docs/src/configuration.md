@@ -48,6 +48,19 @@ IgnorePkg = rsync
 Color
 ```
 
+## Edited config files
+
+paku never overwrites or deletes a package's config file that you have edited, same as pacman:
+
+| When                                            | What happens                                          |
+|-------------------------------------------------|-------------------------------------------------------|
+| upgrade, and the package changed the file too   | your file stays; the new one is saved as `.pacnew`    |
+| upgrade, and the package did not change it      | your file stays                                       |
+| removal (or the new version drops the file)     | your file is renamed to `.pacsave`; `-Rn` deletes it  |
+
+Files matching `NoUpgrade` (paths relative to the install prefix, e.g. `NoUpgrade = etc/foo.conf`)
+are never replaced or removed; new versions are saved as `.pacnew`.
+
 ## Signatures
 
 `paku -Sy` downloads each repository's `<repo>.db.sig` and checks it; `paku -S` checks every
@@ -98,5 +111,4 @@ Downloads use Windows' built-in WinHTTP, so the system's certificates and proxy 
 - Install scriptlets (`.INSTALL`) assume `/` is the MSYS2 root. A failing scriptlet is a warning,
   not an abort; `--noscriptlet` skips them.
 - Release binaries are not code-signed yet; Smart App Control may block them.
-- Not implemented yet: replacing packages (`Replaces`) and saving modified config files as
-  `.pacsave`.
+- Not implemented yet: replacing packages (`Replaces`).

@@ -25,6 +25,8 @@ pub struct Extracted {
     pub meta: PkgMeta,
     /// Installed paths relative to the prefix; directories end with `/`. Sorted.
     pub files: Vec<String>,
+    /// Backup (configuration) files, relative to the prefix.
+    pub backup: Vec<String>,
     /// Raw `.MTREE` (gzip-compressed), stored in the local database.
     pub mtree: Option<Vec<u8>>,
     /// Raw `.INSTALL` scriptlet, if any.
@@ -56,10 +58,22 @@ pub fn extract(pkgfile: &Path, layout: &Layout, staging: &Path) -> Result<Extrac
         .as_ref()
         .and_then(PkgMeta::from_pkginfo)
         .ok_or(Error::BadPackage(name))?;
+    out.backup = info.as_ref().map(|i| backup_paths(layout, i)).unwrap_or_default();
     resolve_links(staging, pending.links, &mut out)?;
     out.files.sort();
     out.files.dedup();
     Ok(out)
+}
+
+/// `backup = <archive path>` entries of `.PKGINFO`, relocated like the files.
+fn backup_paths(layout: &Layout, info: &PkgInfo) -> Vec<String> {
+    info.get_all("backup")
+        .into_iter()
+        .filter_map(|path| match layout.map(path) {
+            Ok(Mapped::Install(rel)) => Some(rel),
+            _ => None,
+        })
+        .collect()
 }
 
 fn handle_entry(
